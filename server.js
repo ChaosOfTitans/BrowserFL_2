@@ -18,9 +18,12 @@ const io     = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// ─── Serve os arquivos estáticos do frontend ──────────────────────────────────
-app.use(express.static(path.join(__dirname, "public")));
-app.use(express.json());
+const publicDir = fs.existsSync(path.join(__dirname, "public"))
+  ? path.join(__dirname, "public")
+  : __dirname;
+app.use(express.static(publicDir));
+console.log(`[static] Servindo arquivos de: ${publicDir}`);
+
 
 // ─── Persistência de temporadas (arquivo JSON simples) ────────────────────────
 const SAVES_DIR = path.join(__dirname, "data");
