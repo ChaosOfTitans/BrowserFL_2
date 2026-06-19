@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>BrowserFL</title>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ═══════════════════ MENU SCREEN ═══════════════════ -->
+<div id="menu-screen" class="screen menu-screen">
+  <div>
+    <div class="menu-title-row">
+      <span style="font-size:26px;">🏈</span>
+      <div class="menu-title">BROWSER<span class="accent">FL</span></div>
+    </div>
+    <div class="menu-sub">SIMULADOR DE FUTEBOL AMERICANO</div>
+    <div class="menu-divider"></div>
+    <div class="menu-team" id="menu-team-name">Time: <span class="accent">Philadelphia Eagles (PHI)</span></div>
+
+    <div class="menu-cards">
+      <div class="menu-card gold featured" id="season-card-btn">
+        <div class="icon">🏆</div>
+        <div class="title" id="season-card-title">NOVA TEMPORADA</div>
+        <div class="subtitle" id="season-card-info">Nenhuma temporada ativa</div>
+        <div class="detail">Inicie uma temporada com 32 times<br>e playoffs completos.</div>
+        <button class="cta">ENTRAR NA TEMPORADA  →</button>
+      </div>
+
+      <div class="menu-card blue" id="friendly-card-btn">
+        <div class="icon">⚡</div>
+        <div class="title">AMISTOSO 1x1</div>
+        <div class="subtitle">Jogue contra um amigo<br>em tempo real</div>
+        <div class="detail">Draft de jogadores + partida<br>online com outro dispositivo.</div>
+        <button class="cta">JOGAR 1x1  →</button>
+      </div>
+
+      <div class="menu-card purple" id="editor-card-btn">
+        <div class="icon">📋</div>
+        <div class="title">EDITOR DE TIME</div>
+        <div class="subtitle" id="editor-card-info">Philadelphia Eagles (PHI)</div>
+        <div class="detail">Gerencie nome, cidade<br>e abreviação do seu time.</div>
+        <button class="cta">ABRIR EDITOR  →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ GAME SCREEN ═══════════════════ -->
+<div id="game-screen" class="screen game-screen">
+  <canvas id="scoreboard-canvas"></canvas>
+  <div class="game-body">
+    <div class="game-left">
+      <div class="game-left-top">
+        <button class="btn btn-ghost" id="back-btn">←  Voltar</button>
+
+        <div class="section-label">Velocidade</div>
+        <div class="pill-row">
+          <button class="pill spd-pill" data-key="slow" data-ms="8000">Lento</button>
+          <button class="pill spd-pill active" data-key="medium" data-ms="3000">Médio</button>
+          <button class="pill spd-pill" data-key="fast" data-ms="150">Rápido</button>
+        </div>
+
+        <div class="ctrl-row">
+          <button class="btn btn-primary" id="play-btn">▶  Iniciar</button>
+          <button class="btn btn-secondary" id="snap-btn">⏭  Snap</button>
+        </div>
+
+        <div class="section-label">Agressividade</div>
+        <div class="pill-row">
+          <button class="pill aggro-pill" data-key="conservative">Conserv.</button>
+          <button class="pill aggro-pill active" data-key="balanced">Equilib.</button>
+          <button class="pill aggro-pill" data-key="aggressive">Agressivo</button>
+        </div>
+
+        <div class="section-label">Foco</div>
+        <div class="pill-row">
+          <button class="pill focus-pill blue" data-key="run">Corrida</button>
+          <button class="pill focus-pill blue active" data-key="balanced">Balanc.</button>
+          <button class="pill focus-pill blue" data-key="pass">Passe</button>
+        </div>
+      </div>
+
+      <div class="tip-text" id="tip-text"></div>
+    </div>
+
+    <div class="game-mid">
+      <div class="live-header">🏈  SEU JOGO</div>
+      <div id="player-panel-slot"></div>
+    </div>
+
+    <div class="game-right">
+      <div class="live-header">📺  OUTROS JOGOS</div>
+      <div class="cards-scroll" id="cards-scroll"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SEASON SELECT SCREEN ═══════════════════ -->
+<div id="season-select-screen" class="screen season-select-screen">
+  <div class="ss-header">
+    <button class="btn btn-secondary" id="ss-back-btn" style="width:100px;">←  Menu</button>
+    <div class="ss-title">TEMPORADAS</div>
+    <button class="btn btn-primary" id="ss-new-btn" style="width:170px;">＋  Nova Temporada</button>
+  </div>
+  <div class="ss-divider"></div>
+  <div class="ss-list" id="ss-list"></div>
+</div>
+
+<!-- Modal: Nova Temporada -->
+<div id="new-season-modal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-title">Nova Temporada</div>
+    <div class="modal-divider"></div>
+
+    <div class="modal-label">Nome do Save</div>
+    <input type="text" class="modal-input" id="ns-name" placeholder="Ex: Eagles 2025 Rebuild...">
+
+    <div class="modal-label">Ano</div>
+    <input type="text" class="modal-input" id="ns-year" value="2025">
+
+    <div class="modal-label">Escolha seu Time</div>
+    <div class="team-grid" id="ns-team-grid"></div>
+
+    <div class="modal-selection" id="ns-selection">Nenhum time selecionado</div>
+    <div class="modal-divider"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="ns-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="ns-confirm" disabled>Criar Temporada  →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ SEASON SCREEN ═══════════════════ -->
+<div id="season-screen" class="screen season-screen">
+  <div class="ss-header">
+    <button class="btn btn-secondary" id="season-back-btn" style="width:100px;">←  Temporadas</button>
+    <div class="ss-title" id="season-screen-title">Time — 2025</div>
+    <div style="width:100px;"></div>
+  </div>
+  <div class="season-tabs">
+    <button class="season-tab active" data-tab="matchup">Próximo Jogo</button>
+    <button class="season-tab" data-tab="schedule">Calendário</button>
+    <button class="season-tab" data-tab="standings">Classificação</button>
+  </div>
+  <div class="season-content" id="season-content"></div>
+</div>
+
+<!-- ═══════════════════ MULTIPLAYER LOBBY ═══════════════════ -->
+<div id="mp-lobby-screen" class="screen season-select-screen">
+  <div class="ss-header">
+    <button class="btn btn-secondary" id="mp-back-btn" style="width:100px;">←  Menu</button>
+    <div class="ss-title">AMISTOSO 1x1</div>
+    <div style="width:100px;"></div>
+  </div>
+  <div class="ss-divider"></div>
+
+  <div style="max-width:440px;margin:0 auto;display:flex;flex-direction:column;gap:16px;padding:24px 0;">
+
+    <!-- Criar sala -->
+    <div class="mp-card" id="mp-create-section">
+      <div class="mp-card-title">🏠  Criar Sala</div>
+      <div class="mp-card-sub">Você cria e compartilha o código com o amigo</div>
+      <button class="btn btn-primary" id="mp-create-btn" style="width:100%;height:46px;">Criar sala</button>
+      <div id="mp-room-code" class="mp-room-code" style="display:none;">
+        <div class="mp-code-label">Código da sala — compartilhe com seu amigo:</div>
+        <div class="mp-code" id="mp-code-display">—</div>
+        <div class="mp-waiting">⏳ Aguardando conexão do adversário...</div>
+      </div>
+    </div>
+
+    <div class="mp-divider-text">ou</div>
+
+    <!-- Entrar em sala -->
+    <div class="mp-card" id="mp-join-section">
+      <div class="mp-card-title">🤝  Entrar em Sala</div>
+      <div class="mp-card-sub">Digite o código que seu amigo compartilhou</div>
+      <input type="text" id="mp-code-input" class="modal-input"
+        placeholder="Ex: BFL-AB12C" style="text-transform:uppercase;letter-spacing:2px;">
+      <button class="btn btn-secondary" id="mp-join-btn" style="width:100%;height:46px;margin-top:8px;">Entrar</button>
+      <div id="mp-join-status" style="font-size:12px;color:var(--muted);text-align:center;margin-top:8px;display:none;"></div>
+    </div>
+
+    <div id="mp-error" class="mp-error" style="display:none;"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════ DRAFT SCREEN ═══════════════════ -->
+<div id="mp-draft-screen" class="screen mp-draft-screen">
+  <div style="text-align:center;padding:40px;color:var(--muted);">Carregando draft...</div>
+</div>
+
+
+<div id="editor-screen" class="screen season-select-screen">
+  <div class="ss-header">
+    <button class="btn btn-secondary" id="editor-back-btn" style="width:100px;">←  Menu</button>
+    <div class="ss-title">EDITOR DE TIME</div>
+    <div style="width:100px;"></div>
+  </div>
+  <div class="ss-divider"></div>
+  <div style="max-width:400px;margin:40px auto;display:flex;flex-direction:column;gap:14px;">
+    <div class="modal-label">Nome do Time</div>
+    <input type="text" class="modal-input" id="editor-name">
+    <div class="modal-label">Cidade</div>
+    <input type="text" class="modal-input" id="editor-city">
+    <div class="modal-label">Abreviação (3 letras)</div>
+    <input type="text" class="modal-input" id="editor-abbr" maxlength="4">
+    <button class="btn btn-primary" id="editor-save-btn" style="margin-top:10px;">Salvar  →</button>
+  </div>
+</div>
+
+<script src="js/models.js"></script>
+<script src="js/play-selector.js"></script>
+<script src="js/season.js"></script>
+<script src="js/sound-manager.js"></script>
+<script src="js/game-screen.js"></script>
+<script src="js/multiplayer.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
