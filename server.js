@@ -19,7 +19,12 @@ const io     = new Server(server, {
 const PORT = process.env.PORT || 3000;
 
 // ─── Serve os arquivos estáticos do frontend ──────────────────────────────────
-app.use(express.static(path.join(__dirname, "public")));
+// Serve arquivos estáticos — tenta public/ primeiro, depois a raiz
+const publicDir = fs.existsSync(path.join(__dirname, "public"))
+  ? path.join(__dirname, "public")
+  : __dirname;
+app.use(express.static(publicDir));
+console.log(`[static] Servindo arquivos de: ${publicDir}`);
 app.use(express.json());
 
 // ─── Persistência de temporadas (arquivo JSON simples) ────────────────────────
