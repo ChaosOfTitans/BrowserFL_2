@@ -9,7 +9,7 @@
   --gold-l: #f5c842;
   --blue: #4d9de0;
   --green: #3fb950;
-  --red: #f85149;a
+  --red: #f85149;
   --white: #e6edf3;
   --muted: #8b949e;
   --purple: #a371f7;
@@ -942,3 +942,6 @@ button {
   .draft-roster { flex: none; max-height: 35vh; }
   .mp-draft-screen { height: 100vh; overflow: hidden; }
 }
+
+.draft-round { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.draft-round .accent { color: var(--gold); font-weight: 700; }

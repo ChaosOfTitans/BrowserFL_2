@@ -9,16 +9,17 @@ const MP = {
 
   draft: {
     active: false,
-    sourceTeamAbbr: null,
-    sourceTeamPlayers: [],
-    hostPicks: [],
-    guestPicks: [],
-    myPicks: [],
-    theirPicks: [],
+    currentTeamAbbr: null,      // time da rodada atual
+    currentTeamPlayers: [],     // jogadores disponíveis na rodada atual
+    hostPicks: [],              // índices escolhidos na rodada atual (host)
+    guestPicks: [],             // índices escolhidos na rodada atual (guest)
+    myPicks: [],                // jogadores montados por MIM (um por posição)
+    theirPicks: [],             // jogadores montados pelo adversário
     turnIsHost: true,
     positionsNeeded: ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K"],
     myPositionsFilled: [],
     theirPositionsFilled: [],
+    currentRound: 0,            // rodada atual (0-10, 11 rodadas no total)
   },
 };
 
@@ -89,8 +90,7 @@ function mpJoinRoom(code, onJoined) {
 }
 
 // ─── Draft ────────────────────────────────────────────────────────────────────
-function _mpStartDraft() {
-  const abbr = NFL_ABBRS[Math.floor(Math.random() * NFL_ABBRS.length)];
+function _mpGetTeamPlayers(abbr) {
   const team = createSampleTeam("", "", abbr, "medium");
   const players = [];
   for (const pos of MP.draft.positionsNeeded) {
@@ -102,32 +102,65 @@ function _mpStartDraft() {
       }});
     }
   }
-  MP.socket.emit("draft_start", { abbr, players }, () => {});
-  _mpInitDraftState(abbr, players);
-  showScreen("mp-draft-screen");
-  renderDraft();
+  return players;
 }
 
-function _mpReceiveDraftStart(abbr, players) {
-  _mpInitDraftState(abbr, players);
-  showScreen("mp-draft-screen");
-  renderDraft();
-}
-
-function _mpInitDraftState(abbr, players) {
+function _mpStartDraft() {
+  // Inicializa o estado completo do draft
   const d = MP.draft;
-  d.active = true; d.sourceTeamAbbr = abbr; d.sourceTeamPlayers = players;
-  d.hostPicks = []; d.guestPicks = [];
+  d.active = true;
   d.myPicks = []; d.theirPicks = [];
   d.myPositionsFilled = []; d.theirPositionsFilled = [];
+  d.currentRound = 0;
   d.turnIsHost = true;
+
+  // Sorteia o time da primeira rodada
+  _mpStartNewRound();
+}
+
+function _mpStartNewRound() {
+  const d = MP.draft;
+  // Sorteia um time que ainda não foi usado nesta rodada
+  const abbr = NFL_ABBRS[Math.floor(Math.random() * NFL_ABBRS.length)];
+  const players = _mpGetTeamPlayers(abbr);
+
+  d.currentTeamAbbr = abbr;
+  d.currentTeamPlayers = players;
+  d.hostPicks = [];
+  d.guestPicks = [];
+
+  // Host envia o time da rodada para o guest
+  if (MP.isHost) {
+    MP.socket.emit("draft_start", { abbr, players, round: d.currentRound }, () => {});
+  }
+
+  showScreen("mp-draft-screen");
+  renderDraft();
+}
+
+function _mpReceiveDraftStart(abbr, players, round) {
+  const d = MP.draft;
+  if (round === 0) {
+    // Primeira rodada — inicializa tudo
+    d.active = true;
+    d.myPicks = []; d.theirPicks = [];
+    d.myPositionsFilled = []; d.theirPositionsFilled = [];
+    d.currentRound = 0;
+    d.turnIsHost = true;
+  }
+  d.currentTeamAbbr = abbr;
+  d.currentTeamPlayers = players;
+  d.hostPicks = [];
+  d.guestPicks = [];
+  showScreen("mp-draft-screen");
+  renderDraft();
 }
 
 function draftPick(playerIdx) {
   const d = MP.draft;
   const isMyTurn = (MP.isHost && d.turnIsHost) || (!MP.isHost && !d.turnIsHost);
   if (!isMyTurn) return;
-  const p = d.sourceTeamPlayers[playerIdx];
+  const p = d.currentTeamPlayers[playerIdx];
   if (!p) return;
   if (d.hostPicks.includes(playerIdx) || d.guestPicks.includes(playerIdx)) return;
   if (d.myPositionsFilled.includes(p.pos)) { showDraftToast(`Você já tem um ${p.pos}!`); return; }
@@ -138,7 +171,7 @@ function draftPick(playerIdx) {
 
 function _mpReceivePick(data) {
   const d = MP.draft;
-  const p = d.sourceTeamPlayers[data.playerIdx];
+  const p = d.currentTeamPlayers[data.playerIdx];
   if (!p) return;
   if (data.byHost) {
     d.hostPicks.push(data.playerIdx);
@@ -268,12 +301,20 @@ function renderDraft() {
   const isMyTurn = (MP.isHost && d.turnIsHost) || (!MP.isHost && !d.turnIsHost);
   const total = d.positionsNeeded.length;
 
+  const round = d.currentRound || 0;
+  const hostPicked  = d.hostPicks.length > 0;
+  const guestPicked = d.guestPicks.length > 0;
+  const waitingForNewTeam = !isMyTurn && (MP.isHost ? hostPicked : guestPicked) && (MP.isHost ? !guestPicked : !hostPicked);
+
   screen.innerHTML = `
     <div class="draft-header">
       <div class="draft-title">🏈  DRAFT</div>
-      <div class="draft-source">Time sorteado: <span class="accent">${d.sourceTeamAbbr}</span></div>
+      <div class="draft-round">Rodada ${round + 1} de ${total}  ·  Posição: <span class="accent">${d.positionsNeeded[round] || "—"}</span></div>
+      <div class="draft-source">Time sorteado: <span class="accent">${d.currentTeamAbbr}</span></div>
       <div class="draft-turn ${isMyTurn ? "my-turn" : "their-turn"}">
-        ${isMyTurn ? "⭐ SUA VEZ de escolher!" : "⏳ Aguardando adversário..."}
+        ${waitingForNewTeam
+          ? "⏳ Aguardando próximo time..."
+          : isMyTurn ? "⭐ SUA VEZ de escolher!" : "⏳ Aguardando adversário..."}
       </div>
       <div class="draft-progress">Você: ${d.myPicks.length}/${total}  ·  Adversário: ${d.theirPicks.length}/${total}</div>
     </div>
@@ -281,7 +322,7 @@ function renderDraft() {
       <div class="draft-pool">
         <div class="draft-section-title">Jogadores disponíveis</div>
         <div class="draft-players">
-          ${d.sourceTeamPlayers.map((p, idx) => {
+          ${d.currentTeamPlayers.map((p, idx) => {
             const tH = d.hostPicks.includes(idx), tG = d.guestPicks.includes(idx);
             const isTaken = tH || tG;
             const takenByMe = (MP.isHost && tH) || (!MP.isHost && tG);

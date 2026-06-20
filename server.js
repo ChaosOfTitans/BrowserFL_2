@@ -18,12 +18,14 @@ const io     = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 
+// ─── Serve os arquivos estáticos do frontend ──────────────────────────────────
+// Serve arquivos estáticos — tenta public/ primeiro, depois a raiz
 const publicDir = fs.existsSync(path.join(__dirname, "public"))
   ? path.join(__dirname, "public")
   : __dirname;
 app.use(express.static(publicDir));
 console.log(`[static] Servindo arquivos de: ${publicDir}`);
-
+app.use(express.json());
 
 // ─── Persistência de temporadas (arquivo JSON simples) ────────────────────────
 const SAVES_DIR = path.join(__dirname, "data");
@@ -183,55 +185,64 @@ io.on("connection", (socket) => {
     const d = room.draft;
     const isHost = room.hostId === socket.id;
 
-    // Verifica turno
-    if (isHost !== d.turnIsHost) {
-      return cb && cb({ ok: false, error: "Não é sua vez." });
-    }
-
-    // Verifica se já foi escolhido
-    if (d.hostPicks.includes(playerIdx) || d.guestPicks.includes(playerIdx)) {
+    if (isHost !== d.turnIsHost) return cb && cb({ ok: false, error: "Não é sua vez." });
+    if (d.hostPicks.includes(playerIdx) || d.guestPicks.includes(playerIdx))
       return cb && cb({ ok: false, error: "Jogador já escolhido." });
-    }
 
     const p = d.players[playerIdx];
     if (!p) return;
 
-    // Verifica posição
     const positions = isHost ? d.hostPositions : d.guestPositions;
-    if (positions.includes(p.pos)) {
+    if (positions.includes(p.pos))
       return cb && cb({ ok: false, error: `Você já tem um ${p.pos}.` });
-    }
 
-    // Registra
-    if (isHost) {
-      d.hostPicks.push(playerIdx);
-      d.hostPositions.push(p.pos);
-    } else {
-      d.guestPicks.push(playerIdx);
-      d.guestPositions.push(p.pos);
-    }
+    if (isHost) { d.hostPicks.push(playerIdx); d.hostPositions.push(p.pos); }
+    else        { d.guestPicks.push(playerIdx); d.guestPositions.push(p.pos); }
 
     d.turnIsHost = !d.turnIsHost;
 
     const needed = 11;
     const complete = d.hostPicks.length >= needed && d.guestPicks.length >= needed;
+    // Após cada par de escolhas (host+guest), nova rodada
+    const newRound = !complete && d.hostPicks.length === d.guestPicks.length;
 
-    // Broadcast para os dois
     io.to(room.id).emit("draft_pick_made", {
-      playerIdx,
-      byHost: isHost,
-      pos: p.pos,
+      playerIdx, byHost: isHost, pos: p.pos,
       turnIsHost: d.turnIsHost,
       hostCount: d.hostPicks.length,
       guestCount: d.guestPicks.length,
-      complete,
+      complete, newRound,
     });
 
-    if (complete) {
-      room.phase = "game";
-      console.log(`[DRAFT] Completo na sala ${room.code}`);
-    }
+    if (complete) { room.phase = "game"; console.log(`[DRAFT] Completo na sala ${room.code}`); }
+    if (cb) cb({ ok: true });
+  });
 
+  // ── Draft: host envia novo time sorteado para a próxima rodada ──────────────
+  socket.on("draft_start", (data, cb) => {
+    const room = findRoomBySocket(socket.id);
+    if (!room || room.hostId !== socket.id) return;
+
+    // Atualiza o time da rodada atual (mantém picks acumulados)
+    if (!room.draft) {
+      room.draft = {
+        players: data.players, abbr: data.abbr,
+        hostPicks: [], guestPicks: [],
+        hostPositions: [], guestPositions: [],
+        turnIsHost: true,
+      };
+    } else {
+      // Nova rodada: reseta picks da rodada, mantém posições acumuladas
+      room.draft.players = data.players;
+      room.draft.abbr = data.abbr;
+      room.draft.hostPicks = [];
+      room.draft.guestPicks = [];
+      room.draft.turnIsHost = data.round % 2 === 0; // alterna quem começa
+    }
+    room.phase = "draft";
+
+    io.to(room.id).emit("draft_started", { abbr: data.abbr, players: data.players, round: data.round || 0 });
+    console.log(`[DRAFT] Rodada ${data.round || 0} — time: ${data.abbr} na sala ${room.code}`);
     if (cb) cb({ ok: true });
   });
 
