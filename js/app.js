@@ -873,11 +873,6 @@ function renderTransfersTab(content, s) {
         <div class="cap-space">Cap space disponível: <span class="${capSpace < 20 ? "red" : "green"}">$${capSpace}M</span></div>
       </div>
 
-      <div class="section-title">📋  Meu Elenco Atual</div>
-      <div class="transfer-roster">
-        ${_renderMyRoster(myRecord.roster, window_.open)}
-      </div>
-
       ${window_.open ? `
         <div class="transfer-actions">
           <button class="transfer-action-btn fa-btn" onclick="transferState.mode='freeagency'; renderSeasonTab();">
@@ -896,6 +891,12 @@ function renderTransfersTab(content, s) {
           </button>
         </div>
       ` : ""}
+
+      <div class="section-title">📋  Meu Elenco Atual</div>
+      <div class="transfer-roster">
+        ${_renderMyRoster(myRecord.roster, window_.open)}
+      </div>
+
     </div>`;
 }
 

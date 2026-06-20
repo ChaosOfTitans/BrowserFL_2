@@ -1129,3 +1129,54 @@ button {
   .field-canvas { height: 260px; flex: none; }
   .field-sidebar { max-height: 200px; }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   RESUMO FINAL DA PARTIDA
+   ═══════════════════════════════════════════════════════════ */
+.summary-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 500; padding: 16px;
+}
+.summary-modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 28px 24px; width: 100%;
+  max-width: 420px; max-height: 90vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 20px;
+  animation: fadeInUp 0.3s ease;
+}
+.summary-result {
+  font-size: 22px; font-weight: 900; text-align: center;
+  letter-spacing: 3px; text-transform: uppercase;
+}
+.summary-score {
+  display: flex; align-items: center; justify-content: center;
+  gap: 20px;
+}
+.summary-team-block { text-align: center; }
+.summary-abbr { font-size: 13px; color: var(--muted); font-weight: 700; letter-spacing: 1px; }
+.summary-pts  { font-size: 52px; font-weight: 900; color: var(--white); line-height: 1; }
+.summary-x    { font-size: 24px; color: var(--muted); font-weight: 300; }
+
+.summary-sections { display: flex; flex-direction: column; gap: 16px; }
+.summary-section  { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.summary-section-title {
+  font-size: 10px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;
+}
+.summary-item {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; color: var(--white); padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.summary-item:last-child { border-bottom: none; }
+.summary-item.injury { color: var(--red); }
+.summary-time { font-size: 10px; color: var(--muted); flex-shrink: 0; margin-left: 8px; }
+
+.mvp-section { border-color: rgba(232,160,32,0.3); background: rgba(232,160,32,0.06); }
+.summary-mvp { text-align: center; padding: 4px 0; }
+.summary-mvp-name  { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+.summary-mvp-pos   { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+.summary-mvp-stats { font-size: 12px; color: var(--white); line-height: 1.6; }
+
+.summary-continue-btn { width: 100%; height: 48px; font-size: 15px; font-weight: 700; }

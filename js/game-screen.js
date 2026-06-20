@@ -74,12 +74,15 @@ class Scoreboard {
     ctx.fillStyle = topGrad; ctx.fillRect(0, 0, W, 2);
 
     const homeX = W * 0.22, isHomePoss = this.possession === "home";
+
+    // 🏈 Bola de futebol — aparece no lado do time com a posse, grande e visível
+    ctx.font = "22px serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
     if (isHomePoss) {
-      ctx.fillStyle = C.gold;
-      ctx.beginPath();
-      ctx.moveTo(homeX - 60, H/2 - 8); ctx.lineTo(homeX - 48, H/2); ctx.lineTo(homeX - 60, H/2 + 8);
-      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillText("🏈", homeX - 68, H / 2);
     }
+
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = "bold 14px Segoe UI";
     ctx.fillStyle = isHomePoss ? this.homeColor : C.muted;
@@ -137,10 +140,10 @@ class Scoreboard {
 
     const awayX = W * 0.78, isAwayPoss = !isHomePoss;
     if (isAwayPoss) {
-      ctx.fillStyle = C.blue;
-      ctx.beginPath();
-      ctx.moveTo(awayX + 60, H/2 - 8); ctx.lineTo(awayX + 48, H/2); ctx.lineTo(awayX + 60, H/2 + 8);
-      ctx.closePath(); ctx.fill();
+      ctx.font = "22px serif";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.globalAlpha = 1;
+      ctx.fillText("🏈", awayX + 68, H / 2);
     }
     ctx.font = "bold 14px Segoe UI";
     ctx.fillStyle = isAwayPoss ? this.awayColor : C.muted;
@@ -813,50 +816,99 @@ class GameScreenController {
     if (this.playerCard) this.playerCard.markDone(h.score > a.score);
     this.playBtn.style.display = "none";
     this.snapBtn.style.display = "none";
-    this.showMVPCard(h);
-    this.showContinueButton(h.score, a.score);
+    this.showMatchSummary(h, a);
   }
 
-  showMVPCard(homeTeam) {
-    const mvp = getTeamMVP(homeTeam);
-    if (!mvp || mvp.mvpScore() === 0) return;
-    const stats = formatPlayerStats(mvp);
-    const won = this.state.homeTeam.score > this.state.awayTeam.score;
+  showMatchSummary(homeTeam, awayTeam) {
+    const won = homeTeam.score > awayTeam.score;
+    const tied = homeTeam.score === awayTeam.score;
+    const result = won ? "VITÓRIA" : tied ? "EMPATE" : "DERROTA";
+    const resultColor = won ? "#3fb950" : tied ? "#e8a020" : "#f85149";
 
-    let card = document.getElementById("mvp-card");
-    if (!card) {
-      card = document.createElement("div");
-      card.id = "mvp-card";
-      card.className = "mvp-card";
-      // Insere no painel do meio (game-mid), abaixo do playerCard
-      this.playerSlot.appendChild(card);
+    // Coleta pontuadores do histórico
+    const scorers = this.playerCard?.scorerHistory || [];
+
+    // Coleta lesões do jogo
+    const injuries = [];
+    for (const players of Object.values(homeTeam.roster)) {
+      for (const p of players) {
+        if (p.injured) injuries.push(`${p.name} (${p.position}) — ${homeTeam.abbreviation}`);
+      }
     }
-    card.innerHTML = `
-      <div class="mvp-icon">${won ? "⭐" : "📊"}</div>
-      <div class="mvp-title">MVP DA PARTIDA</div>
-      <div class="mvp-name ${ovrColorClass(mvp.overall)}">${mvp.name}</div>
-      <div class="mvp-pos">${mvp.position}  ·  <span class="${ovrColorClass(mvp.overall)}">${mvp.overall} OVR</span></div>
-      <div class="mvp-stats">${stats}</div>
-    `;
+    for (const players of Object.values(awayTeam.roster)) {
+      for (const p of players) {
+        if (p.injured) injuries.push(`${p.name} (${p.position}) — ${awayTeam.abbreviation}`);
+      }
+    }
+
+    // MVP
+    const mvp = getTeamMVP(homeTeam);
+    const mvpStats = mvp && mvp.mvpScore() > 0 ? formatPlayerStats(mvp) : null;
+
+    // Cria modal
+    let overlay = document.getElementById("match-summary-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "match-summary-overlay";
+      overlay.className = "summary-overlay";
+      document.body.appendChild(overlay);
+    }
+
+    overlay.innerHTML = `
+      <div class="summary-modal">
+        <div class="summary-result" style="color:${resultColor}">${result}</div>
+        <div class="summary-score">
+          <div class="summary-team-block">
+            <div class="summary-abbr">${homeTeam.abbreviation}</div>
+            <div class="summary-pts">${homeTeam.score}</div>
+          </div>
+          <div class="summary-x">×</div>
+          <div class="summary-team-block">
+            <div class="summary-abbr">${awayTeam.abbreviation}</div>
+            <div class="summary-pts">${awayTeam.score}</div>
+          </div>
+        </div>
+
+        <div class="summary-sections">
+          ${scorers.length ? `
+            <div class="summary-section">
+              <div class="summary-section-title">🏈  Pontuação</div>
+              ${[...scorers].reverse().map(s =>
+                `<div class="summary-item">${s.text}<span class="summary-time">Q${s.quarter} ${s.time}</span></div>`
+              ).join("")}
+            </div>` : ""}
+
+          ${injuries.length ? `
+            <div class="summary-section">
+              <div class="summary-section-title">🚑  Lesões</div>
+              ${injuries.map(i => `<div class="summary-item injury">${i}</div>`).join("")}
+            </div>` : ""}
+
+          ${mvpStats ? `
+            <div class="summary-section mvp-section">
+              <div class="summary-section-title">⭐  MVP da Partida</div>
+              <div class="summary-mvp">
+                <div class="summary-mvp-name ${ovrColorClass(mvp.overall)}">${mvp.name}</div>
+                <div class="summary-mvp-pos">${mvp.position} · ${mvp.overall} OVR</div>
+                <div class="summary-mvp-stats">${mvpStats}</div>
+              </div>
+            </div>` : ""}
+        </div>
+
+        <button class="btn btn-primary summary-continue-btn" id="summary-continue-btn">
+          ${won ? "🏆  Continuar  →" : "Continuar  →"}
+        </button>
+      </div>`;
+
+    overlay.style.display = "flex";
+    document.getElementById("summary-continue-btn").onclick = () => {
+      overlay.style.display = "none";
+      if (window.onGameFinished) window.onGameFinished(homeTeam.score, awayTeam.score);
+    };
   }
 
   showContinueButton(homeScore, awayScore) {
-    let btn = document.getElementById("continue-btn");
-    if (!btn) {
-      btn = document.createElement("button");
-      btn.id = "continue-btn";
-      btn.className = "btn btn-primary";
-      btn.style.width = "100%";
-      this.playBtn.parentElement.appendChild(btn);
-    }
-    const won = homeScore > awayScore;
-    btn.textContent = won ? "🏆  Continuar  →" : "Continuar  →";
-    btn.style.display = "block";
-    btn.onclick = () => {
-      btn.style.display = "none";
-      this.playBtn.style.display = "block";
-      this.snapBtn.style.display = "block";
-      if (window.onGameFinished) window.onGameFinished(homeScore, awayScore);
-    };
+    // Mantido para compatibilidade com multiplayer
+    if (window.onGameFinished) window.onGameFinished(homeScore, awayScore);
   }
 }
