@@ -32,6 +32,10 @@ class TeamRecord {
       seasonPassYards:0, seasonRushYards:0, seasonTotalYards:0,
       seasonTDs:0, seasonFGs:0, seasonTurnovers:0, seasonFirstDowns:0,
       seasonGames:0,
+      // Roster persistente e cap salarial
+      roster: null,    // null = usa roster gerado dinamicamente
+      capUsed: 0,      // cap utilizado em $M
+      capTotal: 180,   // cap total em $M
     }, data);
   }
   get gamesPlayed() { return this.wins + this.losses + this.ties; }

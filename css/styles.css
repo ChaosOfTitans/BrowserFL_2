@@ -945,3 +945,130 @@ button {
 
 .draft-round { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
 .draft-round .accent { color: var(--gold); font-weight: 700; }
+
+/* ═══════════════════════════════════════════════════════════
+   TRANSFERÊNCIAS
+   ═══════════════════════════════════════════════════════════ */
+
+.transfer-wrap { max-width: 900px; margin: 0 auto; padding-bottom: 40px; }
+
+/* Badge janela aberta/fechada */
+.transfer-window-badge {
+  padding: 10px 16px; border-radius: 10px; font-size: 12px; font-weight: 600;
+  margin-bottom: 18px; text-align: center;
+}
+.transfer-window-badge.open   { background: rgba(63,185,80,0.12); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+.transfer-window-badge.closed { background: rgba(248,81,73,0.12); color: var(--red);   border: 1px solid rgba(248,81,73,0.3); }
+
+/* Cap salarial */
+.cap-bar { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; }
+.cap-bar-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.cap-label { font-size: 12px; font-weight: 700; color: var(--white); }
+.cap-numbers { font-size: 12px; color: var(--muted); }
+.cap-bar-track { height: 8px; background: #2d333b; border-radius: 4px; overflow: hidden; margin-bottom: 6px; }
+.cap-bar-fill { height: 100%; background: var(--green); border-radius: 4px; transition: width 0.3s; }
+.cap-bar-fill.warning { background: var(--gold); }
+.cap-bar-fill.danger  { background: var(--red); }
+.cap-space { font-size: 11px; color: var(--muted); }
+.cap-space .green { color: var(--green); font-weight: 700; }
+.cap-space .red   { color: var(--red);   font-weight: 700; }
+
+/* Roster da tela de transferências */
+.transfer-roster { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; }
+.tr-player-row {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px;
+}
+.tr-pos    { font-size: 10px; color: var(--gold); font-weight: 700; width: 28px; flex-shrink: 0; }
+.tr-role   { font-size: 9px; color: var(--muted); width: 28px; flex-shrink: 0; }
+.tr-name   { font-size: 12px; color: var(--white); flex: 1; }
+.tr-ovr    { font-size: 12px; font-weight: 800; width: 28px; text-align: right; flex-shrink: 0; }
+.tr-salary { font-size: 11px; color: var(--muted); width: 50px; text-align: right; flex-shrink: 0; }
+.tr-release-btn {
+  font-size: 10px; padding: 3px 8px; border-radius: 6px;
+  background: transparent; border: 1px solid var(--red); color: var(--red);
+  cursor: pointer; font-family: inherit; flex-shrink: 0;
+}
+.tr-release-btn:hover { background: rgba(248,81,73,0.15); }
+.tr-no-cap { font-size: 10px; color: var(--red); flex-shrink: 0; }
+
+/* Botões de ação */
+.transfer-actions { display: flex; gap: 12px; margin-top: 8px; }
+.transfer-action-btn {
+  flex: 1; display: flex; align-items: center; gap: 14px;
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 16px 18px; cursor: pointer;
+  font-family: inherit; transition: border-color 0.15s;
+}
+.transfer-action-btn:hover { border-color: var(--gold); }
+.transfer-action-btn.trade-btn:hover { border-color: var(--blue); }
+.ta-icon  { font-size: 28px; flex-shrink: 0; }
+.ta-title { font-size: 14px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+.ta-sub   { font-size: 11px; color: var(--muted); }
+
+/* Mercado livre */
+.tr-back-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.tr-cap-mini { font-size: 12px; color: var(--muted); }
+.tr-cap-mini .green { color: var(--green); font-weight: 700; }
+.tr-cap-mini .red   { color: var(--red);   font-weight: 700; }
+
+.fa-list { display: flex; flex-direction: column; gap: 6px; }
+.fa-player {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 14px;
+}
+.tr-sign-btn { height: 32px; font-size: 11px; padding: 0 12px; flex-shrink: 0; }
+
+/* Trade */
+.trade-team-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+}
+.trade-team-card {
+  background: var(--card); border: 1.5px solid var(--border);
+  border-radius: 10px; padding: 12px 8px; text-align: center;
+  cursor: pointer; transition: border-color 0.15s;
+}
+.trade-team-card:hover { border-color: var(--gold); }
+.ttc-abbr   { font-size: 16px; font-weight: 800; color: var(--gold); margin-bottom: 4px; }
+.ttc-name   { font-size: 10px; color: var(--muted); margin-bottom: 4px; }
+.ttc-record { font-size: 11px; color: var(--white); font-weight: 600; }
+
+.trade-cols { display: flex; gap: 12px; }
+.trade-col  { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.trade-col-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.trade-mid  { flex: 0 0 130px; display: flex; flex-direction: column; align-items: center; padding-top: 32px; gap: 10px; }
+.trade-arrow { font-size: 28px; color: var(--muted); }
+.trade-value { text-align: center; }
+.tv-mine  { font-size: 12px; color: var(--gold); font-weight: 700; }
+.tv-their { font-size: 12px; color: var(--blue); font-weight: 700; }
+.tv-fair  { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+.trade-player {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 10px; cursor: pointer;
+  transition: border-color 0.15s;
+}
+.trade-player:hover   { border-color: var(--muted); }
+.trade-player.selected { border-color: var(--gold); background: rgba(232,160,32,0.08); }
+.tp-check { color: var(--gold); font-weight: 800; font-size: 14px; margin-left: auto; flex-shrink: 0; }
+
+/* Toast */
+.transfer-toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--card); border: 1px solid var(--gold); color: var(--white);
+  font-size: 13px; font-weight: 600; padding: 12px 24px; border-radius: 24px;
+  opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; z-index: 300;
+  max-width: 90vw; text-align: center;
+}
+.transfer-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* Mobile */
+@media (max-width: 768px) {
+  .trade-team-grid { grid-template-columns: repeat(3, 1fr); }
+  .trade-cols { flex-direction: column; }
+  .trade-mid { flex: none; flex-direction: row; padding-top: 0; flex-wrap: wrap; justify-content: center; }
+  .transfer-actions { flex-direction: column; }
+}

@@ -551,6 +551,350 @@ function renderSeasonTab() {
     }
     content.innerHTML = html;
   }
+
+  else if (seasonTab === "transfers") {
+    renderTransfersTab(content, s);
+  }
+}
+
+/* ─── Transferências ────────────────────────────────────────────────────────── */
+
+// Estado da UI de transferências
+let transferState = {
+  mode: "menu",        // "menu" | "freeagency" | "trade"
+  tradeTargetAbbr: null,
+  myOfferedPlayers: [],
+  theirWantedPlayers: [],
+};
+
+function renderTransfersTab(content, s) {
+  const window_ = transferWindowStatus(s);
+  const myRecord = s.teams[s.playerTeam];
+
+  // Garante que o roster persistente existe
+  if (!myRecord.roster) {
+    const team = createSampleTeam(myRecord.name, myRecord.city, myRecord.abbreviation, "strong");
+    myRecord.roster = teamToRoster(team);
+    myRecord.capUsed = calcCapUsed(myRecord.roster);
+    saveSeasonToStorage(currentSaveId, s);
+  }
+
+  const capSpace = parseFloat((myRecord.capTotal - myRecord.capUsed).toFixed(1));
+
+  if (transferState.mode === "freeagency") {
+    renderFreeAgency(content, s, myRecord, capSpace, window_);
+    return;
+  }
+  if (transferState.mode === "trade") {
+    renderTradeScreen(content, s, myRecord, capSpace, window_);
+    return;
+  }
+
+  // Menu principal
+  content.innerHTML = `
+    <div class="transfer-wrap">
+      <div class="transfer-window-badge ${window_.open ? "open" : "closed"}">
+        ${window_.open ? "🟢" : "🔴"}  ${window_.msg}
+      </div>
+
+      <div class="cap-bar">
+        <div class="cap-bar-header">
+          <span class="cap-label">Cap Salarial</span>
+          <span class="cap-numbers">$${myRecord.capUsed}M / $${myRecord.capTotal}M</span>
+        </div>
+        <div class="cap-bar-track">
+          <div class="cap-bar-fill ${capSpace < 20 ? "danger" : capSpace < 50 ? "warning" : ""}"
+            style="width:${Math.min(100, (myRecord.capUsed / myRecord.capTotal) * 100).toFixed(1)}%">
+          </div>
+        </div>
+        <div class="cap-space">Cap space disponível: <span class="${capSpace < 20 ? "red" : "green"}">$${capSpace}M</span></div>
+      </div>
+
+      <div class="section-title">📋  Meu Elenco Atual</div>
+      <div class="transfer-roster">
+        ${_renderMyRoster(myRecord.roster, window_.open)}
+      </div>
+
+      ${window_.open ? `
+        <div class="transfer-actions">
+          <button class="transfer-action-btn fa-btn" onclick="transferState.mode='freeagency'; renderSeasonTab();">
+            <div class="ta-icon">🏪</div>
+            <div class="ta-info">
+              <div class="ta-title">Mercado Livre</div>
+              <div class="ta-sub">Contratar jogadores sem time</div>
+            </div>
+          </button>
+          <button class="transfer-action-btn trade-btn" onclick="transferState.mode='trade'; transferState.tradeTargetAbbr=null; renderSeasonTab();">
+            <div class="ta-icon">🔄</div>
+            <div class="ta-info">
+              <div class="ta-title">Propor Troca</div>
+              <div class="ta-sub">Negociar com outros times</div>
+            </div>
+          </button>
+        </div>
+      ` : ""}
+    </div>`;
+}
+
+function _renderMyRoster(roster, canRelease) {
+  const order = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K"];
+  return order.map(pos => {
+    const players = roster[pos] || [];
+    return players.map((p, idx) => {
+      const isStarter = idx === 0;
+      return `<div class="tr-player-row">
+        <span class="tr-pos">${pos}</span>
+        <span class="tr-role">${isStarter ? "TIT" : "RES"}</span>
+        <span class="tr-name">${p.name}</span>
+        <span class="tr-ovr ${ovrColorClass(p.overall)}">${p.overall}</span>
+        <span class="tr-salary">${salaryLabel(p.salary || calcSalary(p.overall, pos))}</span>
+        ${canRelease && !isStarter ? `<button class="tr-release-btn" onclick="releasePlayer('${pos}',${idx})">Dispensar</button>` : ""}
+      </div>`;
+    }).join("");
+  }).join("");
+}
+
+function releasePlayer(pos, idx) {
+  const s = currentSeason;
+  const myRecord = s.teams[s.playerTeam];
+  if (!myRecord.roster || !myRecord.roster[pos]) return;
+
+  const player = myRecord.roster[pos][idx];
+  if (!player) return;
+  if (!confirm(`Dispensar ${player.name}? Ele sairá do elenco.`)) return;
+
+  myRecord.roster[pos].splice(idx, 1);
+  myRecord.capUsed = calcCapUsed(myRecord.roster);
+  saveSeasonToStorage(currentSaveId, s);
+  renderSeasonTab();
+}
+
+// ─── Mercado Livre ────────────────────────────────────────────────────────────
+function renderFreeAgency(content, s, myRecord, capSpace, window_) {
+  const usedNames = new Set();
+  for (const players of Object.values(myRecord.roster)) {
+    for (const p of players) usedNames.add(p.name);
+  }
+  const agents = generateFreeAgents(usedNames);
+
+  content.innerHTML = `
+    <div class="transfer-wrap">
+      <div class="tr-back-row">
+        <button class="btn btn-secondary" onclick="transferState.mode='menu'; renderSeasonTab();">←  Voltar</button>
+        <div class="tr-cap-mini">Cap livre: <span class="${capSpace < 20 ? "red" : "green"}">$${capSpace}M</span></div>
+      </div>
+      <div class="section-title">🏪  Mercado Livre</div>
+      <div class="fa-list">
+        ${agents.map(p => `
+          <div class="fa-player">
+            <span class="tr-pos">${p.position}</span>
+            <span class="tr-name">${p.name}</span>
+            <span class="tr-ovr ${ovrColorClass(p.overall)}">${p.overall}</span>
+            <span class="tr-salary">${salaryLabel(p.salary)}</span>
+            ${p.salary <= capSpace
+              ? `<button class="btn btn-primary tr-sign-btn" onclick="signFreeAgent(${JSON.stringify(p).replace(/"/g,'&quot;')})">Contratar</button>`
+              : `<span class="tr-no-cap">Sem cap</span>`}
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
+
+function signFreeAgent(player) {
+  const s = currentSeason;
+  const myRecord = s.teams[s.playerTeam];
+  const capSpace = parseFloat((myRecord.capTotal - myRecord.capUsed).toFixed(1));
+
+  if (player.salary > capSpace) {
+    alert(`Cap insuficiente. Você tem $${capSpace}M disponível.`); return;
+  }
+
+  const pos = player.position;
+  if (!myRecord.roster[pos]) myRecord.roster[pos] = [];
+
+  // Adiciona como reserva (posição 1+)
+  myRecord.roster[pos].push({
+    name: player.name, position: pos, overall: player.overall,
+    salary: player.salary, attrs: player.attrs || {}, injured: false,
+  });
+  myRecord.capUsed = calcCapUsed(myRecord.roster);
+  saveSeasonToStorage(currentSaveId, s);
+
+  showTransferToast(`✅ ${player.name} contratado por ${salaryLabel(player.salary)}/ano!`);
+  renderSeasonTab();
+}
+
+// ─── Trocas ───────────────────────────────────────────────────────────────────
+function renderTradeScreen(content, s, myRecord, capSpace, window_) {
+  if (!transferState.tradeTargetAbbr) {
+    // Tela de seleção de time
+    const teams = Object.values(s.teams)
+      .filter(t => !t.isPlayer)
+      .sort((a,b) => b.strength - a.strength);
+
+    content.innerHTML = `
+      <div class="transfer-wrap">
+        <div class="tr-back-row">
+          <button class="btn btn-secondary" onclick="transferState.mode='menu'; renderSeasonTab();">←  Voltar</button>
+          <div class="tr-cap-mini">Cap livre: <span class="${capSpace < 20 ? "red" : "green"}">$${capSpace}M</span></div>
+        </div>
+        <div class="section-title">🔄  Escolha o time para negociar</div>
+        <div class="trade-team-grid">
+          ${teams.map(t => `
+            <div class="trade-team-card" onclick="transferState.tradeTargetAbbr='${t.abbreviation}'; transferState.myOfferedPlayers=[]; transferState.theirWantedPlayers=[]; renderSeasonTab();">
+              <div class="ttc-abbr">${t.abbreviation}</div>
+              <div class="ttc-name">${t.city}</div>
+              <div class="ttc-record">${t.recordStr}</div>
+            </div>`).join("")}
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Tela de proposta de troca
+  const theirRecord = s.teams[transferState.tradeTargetAbbr];
+  const theirTeam = createSampleTeam(theirRecord.name, theirRecord.city, theirRecord.abbreviation, "medium");
+  const theirRoster = theirRecord.roster || teamToRoster(theirTeam);
+
+  const myPlayers   = _flatRoster(myRecord.roster);
+  const theirPlayers = _flatRoster(theirRoster);
+
+  const offered = transferState.myOfferedPlayers;
+  const wanted  = transferState.theirWantedPlayers;
+
+  const myVal    = _tradeValue(offered);
+  const theirVal = _tradeValue(wanted);
+  const ratio    = wanted.length > 0 ? myVal / theirVal : 0;
+  const fairness = ratio >= 0.85 ? "🟢 Equilibrada" : ratio >= 0.65 ? "🟡 Desfavorável para você" : "🔴 Muito desequilibrada";
+
+  content.innerHTML = `
+    <div class="transfer-wrap">
+      <div class="tr-back-row">
+        <button class="btn btn-secondary" onclick="transferState.tradeTargetAbbr=null; renderSeasonTab();">←  Times</button>
+        <span style="font-size:13px;font-weight:700;color:var(--white);">vs ${theirRecord.city} ${theirRecord.abbreviation}</span>
+      </div>
+
+      <div class="trade-cols">
+        <div class="trade-col">
+          <div class="trade-col-title">Você oferece</div>
+          ${myPlayers.map(p => {
+            const sel = offered.find(o => o.name === p.name);
+            return `<div class="trade-player ${sel ? "selected" : ""}" onclick="toggleTradePlayer('my','${p.name}','${p.position}',${p.overall},${p.salary||0})">
+              <span class="tr-pos">${p.position}</span>
+              <span class="tr-name">${p.name}</span>
+              <span class="tr-ovr ${ovrColorClass(p.overall)}">${p.overall}</span>
+              ${sel ? '<span class="tp-check">✓</span>' : ''}
+            </div>`;
+          }).join("")}
+        </div>
+
+        <div class="trade-mid">
+          <div class="trade-arrow">⇄</div>
+          <div class="trade-value">
+            <div class="tv-mine">Você: ${myVal.toFixed(0)} pts</div>
+            <div class="tv-their">Eles: ${theirVal.toFixed(0)} pts</div>
+            <div class="tv-fair">${offered.length && wanted.length ? fairness : "—"}</div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:12px;"
+            onclick="proposeTrade()"
+            ${!offered.length || !wanted.length ? "disabled" : ""}>
+            Propor Troca
+          </button>
+        </div>
+
+        <div class="trade-col">
+          <div class="trade-col-title">Você recebe</div>
+          ${theirPlayers.map(p => {
+            const sel = wanted.find(w => w.name === p.name);
+            return `<div class="trade-player ${sel ? "selected" : ""}" onclick="toggleTradePlayer('their','${p.name}','${p.position}',${p.overall},${p.salary||0})">
+              <span class="tr-pos">${p.position}</span>
+              <span class="tr-name">${p.name}</span>
+              <span class="tr-ovr ${ovrColorClass(p.overall)}">${p.overall}</span>
+              ${sel ? '<span class="tp-check">✓</span>' : ''}
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+    </div>`;
+}
+
+function _flatRoster(roster) {
+  const result = [];
+  const order = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K"];
+  for (const pos of order) {
+    for (const p of (roster[pos] || [])) {
+      result.push({ ...p, position: pos });
+    }
+  }
+  return result;
+}
+
+function toggleTradePlayer(side, name, position, overall, salary) {
+  const list = side === "my" ? transferState.myOfferedPlayers : transferState.theirWantedPlayers;
+  const idx = list.findIndex(p => p.name === name);
+  if (idx >= 0) list.splice(idx, 1);
+  else list.push({ name, position, overall, salary });
+  renderSeasonTab();
+}
+
+function proposeTrade() {
+  const s = currentSeason;
+  const myRecord    = s.teams[s.playerTeam];
+  const theirRecord = s.teams[transferState.tradeTargetAbbr];
+  const theirTeam   = createSampleTeam(theirRecord.name, theirRecord.city, theirRecord.abbreviation, "medium");
+  const theirRoster = theirRecord.roster || teamToRoster(theirTeam);
+
+  const result = evaluateTrade({
+    myPlayers:    transferState.myOfferedPlayers,
+    theirPlayers: transferState.theirWantedPlayers,
+  });
+
+  if (!result.accepted) {
+    showTransferToast("❌ " + result.reason, 4000);
+    return;
+  }
+
+  // Executa a troca
+  const offered = transferState.myOfferedPlayers;
+  const wanted  = transferState.theirWantedPlayers;
+
+  // Remove oferecidos do meu roster
+  for (const op of offered) {
+    const arr = myRecord.roster[op.position] || [];
+    const i = arr.findIndex(p => p.name === op.name);
+    if (i >= 0) arr.splice(i, 1);
+  }
+  // Adiciona os que quero ao meu roster
+  for (const wp of wanted) {
+    if (!myRecord.roster[wp.position]) myRecord.roster[wp.position] = [];
+    // Remove do roster deles
+    const theirArr = theirRoster[wp.position] || [];
+    const ti = theirArr.findIndex(p => p.name === wp.name);
+    if (ti >= 0) theirArr.splice(ti, 1);
+    myRecord.roster[wp.position].push({ ...wp, attrs: wp.attrs || {} });
+  }
+
+  myRecord.capUsed = calcCapUsed(myRecord.roster);
+  transferState.myOfferedPlayers = [];
+  transferState.theirWantedPlayers = [];
+  transferState.tradeTargetAbbr = null;
+  transferState.mode = "menu";
+
+  saveSeasonToStorage(currentSaveId, s);
+  showTransferToast(`✅ Troca aprovada! ${wanted.map(p=>p.name).join(", ")} chegam ao seu time.`, 4000);
+  renderSeasonTab();
+}
+
+function showTransferToast(msg, duration = 3000) {
+  let t = document.getElementById("transfer-toast");
+  if (!t) {
+    t = document.createElement("div");
+    t.id = "transfer-toast";
+    t.className = "transfer-toast";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), duration);
 }
 
 function playSeasonGame() {
