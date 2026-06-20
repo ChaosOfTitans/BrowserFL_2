@@ -1469,3 +1469,43 @@ const EXTRA_ROSTERS = {
 
 // Mescla os dois objetos para ter todos os 32 times
 const ALL_ROSTERS = { ...NFL_ROSTERS, ...EXTRA_ROSTERS };
+
+// ─── Cores e identidade visual dos times ──────────────────────────────────────
+const TEAM_COLORS = {
+  BAL:{ primary:"#241773", secondary:"#9E7C0C", text:"#fff" },
+  PIT:{ primary:"#FFB612", secondary:"#101820", text:"#000" },
+  CLE:{ primary:"#311D00", secondary:"#FF3C00", text:"#fff" },
+  CIN:{ primary:"#FB4F14", secondary:"#000000", text:"#fff" },
+  KC: { primary:"#E31837", secondary:"#FFB81C", text:"#fff" },
+  BUF:{ primary:"#00338D", secondary:"#C60C30", text:"#fff" },
+  MIA:{ primary:"#008E97", secondary:"#FC4C02", text:"#fff" },
+  NE: { primary:"#002244", secondary:"#C60C30", text:"#fff" },
+  NYJ:{ primary:"#125740", secondary:"#000000", text:"#fff" },
+  LV: { primary:"#000000", secondary:"#A5ACAF", text:"#fff" },
+  LAC:{ primary:"#0080C6", secondary:"#FFC20E", text:"#fff" },
+  DEN:{ primary:"#FB4F14", secondary:"#002244", text:"#fff" },
+  HOU:{ primary:"#03202F", secondary:"#A71930", text:"#fff" },
+  IND:{ primary:"#002C5F", secondary:"#A2AAAD", text:"#fff" },
+  TEN:{ primary:"#0C2340", secondary:"#4B92DB", text:"#fff" },
+  JAC:{ primary:"#006778", secondary:"#9F792C", text:"#fff" },
+  SF: { primary:"#AA0000", secondary:"#B3995D", text:"#fff" },
+  SEA:{ primary:"#002244", secondary:"#69BE28", text:"#fff" },
+  LAR:{ primary:"#003594", secondary:"#FFA300", text:"#fff" },
+  ARI:{ primary:"#97233F", secondary:"#000000", text:"#fff" },
+  PHI:{ primary:"#004C54", secondary:"#A5ACAF", text:"#fff" },
+  DAL:{ primary:"#003594", secondary:"#C0C0C0", text:"#fff" },
+  NYG:{ primary:"#0B2265", secondary:"#A71930", text:"#fff" },
+  WAS:{ primary:"#5A1414", secondary:"#FFB612", text:"#fff" },
+  GB: { primary:"#203731", secondary:"#FFB612", text:"#fff" },
+  MIN:{ primary:"#4F2683", secondary:"#FFC62F", text:"#fff" },
+  CHI:{ primary:"#0B162A", secondary:"#C83803", text:"#fff" },
+  DET:{ primary:"#0076B6", secondary:"#B0B7BC", text:"#fff" },
+  NO: { primary:"#101820", secondary:"#D3BC8D", text:"#fff" },
+  TB: { primary:"#D50A0A", secondary:"#FF7900", text:"#fff" },
+  ATL:{ primary:"#A71930", secondary:"#000000", text:"#fff" },
+  CAR:{ primary:"#0085CA", secondary:"#101820", text:"#fff" },
+};
+
+function getTeamColor(abbr) {
+  return TEAM_COLORS[abbr] || { primary:"#1c2230", secondary:"#e8a020", text:"#fff" };
+}

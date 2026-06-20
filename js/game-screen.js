@@ -22,6 +22,7 @@ class Scoreboard {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.homeAbbr = "PHI"; this.awayAbbr = "OPP";
+    this.homeColor = "#e8a020"; this.awayColor = "#4d9de0";
     this.homeScore = 0; this.awayScore = 0;
     this.quarter = 1; this.seconds = 900;
     this.down = 1; this.yards = 10; this.ballPos = 25;
@@ -81,7 +82,7 @@ class Scoreboard {
     }
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.font = "bold 14px Segoe UI";
-    ctx.fillStyle = isHomePoss ? C.gold : C.muted;
+    ctx.fillStyle = isHomePoss ? this.homeColor : C.muted;
     ctx.fillText(this.homeAbbr, homeX - 50, 26);
 
     const flashCol = (this._flash && isHomePoss) ? C.goldL : C.white;
@@ -120,8 +121,10 @@ class Scoreboard {
     ctx.fillRect(barL + barW * 0.5 - 0.5, barY, 1, barH);
 
     // Bolinha da bola — cor pelo time com posse, glow
-    const ballX = barL + barW * (this.ballPos / 100);
-    const ballColor = isHomePoss ? C.gold : C.blue;
+    // Posição da bola: home ataca da esquerda para direita, away da direita para esquerda
+    const displayPos = isHomePoss ? this.ballPos : (100 - this.ballPos);
+    const ballX = barL + barW * (displayPos / 100);
+    const ballColor = isHomePoss ? this.homeColor : this.awayColor;
     // Glow
     const grd = ctx.createRadialGradient(ballX, barY + barH/2, 0, ballX, barY + barH/2, 10);
     grd.addColorStop(0, ballColor + "cc");
@@ -140,7 +143,7 @@ class Scoreboard {
       ctx.closePath(); ctx.fill();
     }
     ctx.font = "bold 14px Segoe UI";
-    ctx.fillStyle = isAwayPoss ? C.blue : C.muted;
+    ctx.fillStyle = isAwayPoss ? this.awayColor : C.muted;
     ctx.fillText(this.awayAbbr, awayX + 50, 26);
 
     const flashCol2 = (this._flash && isAwayPoss) ? C.blue : C.white;
@@ -577,6 +580,10 @@ class GameScreenController {
 
     this.scoreboard.homeAbbr = homeTeam.abbreviation;
     this.scoreboard.awayAbbr = awayTeam.abbreviation;
+    const hc = getTeamColor(homeTeam.abbreviation);
+    const ac = getTeamColor(awayTeam.abbreviation);
+    this.scoreboard.homeColor = hc.primary;
+    this.scoreboard.awayColor = ac.primary;
     // Força redimensionamento depois que a tela fica visível (importante no mobile)
     requestAnimationFrame(() => {
       this.scoreboard._resize();

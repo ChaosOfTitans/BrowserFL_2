@@ -463,14 +463,26 @@ function renderMatchupTab(content, s) {
         </div>
       </div>
 
-      <div class="section-title centered">🏈  Escalação titular — ${myRecord.abbreviation}</div>
-      <div class="roster-grid" id="my-roster-grid">${rosterHtml(myTeamFull)}</div>
+      <div class="section-title centered">🏈  Escalação — ${myRecord.abbreviation}</div>
+      <div class="field-lineup-wrap">
+        <canvas id="field-canvas" class="field-canvas"></canvas>
+        <div class="field-sidebar" id="field-sidebar">
+          <div class="sidebar-title">Clique em uma posição para trocar</div>
+          <div id="sidebar-player-list"></div>
+        </div>
+      </div>
 
       <div style="height:24px;"></div>
     </div>
   `;
 
   document.getElementById("play-matchup-btn").onclick = () => playSeasonGame();
+
+  // Inicializa o campo desenhado após o DOM estar pronto
+  requestAnimationFrame(() => {
+    initFieldCanvas();
+    drawField(myTeamFull);
+  });
 
   document.getElementById("off-pb-grid").querySelectorAll("[data-off-toggle]").forEach(card => {
     card.onclick = () => {
@@ -507,6 +519,208 @@ function renderMatchupTab(content, s) {
       renderMatchupTab(content, s);
     };
   });
+}
+
+/* ─── Campo de futebol americano visual ───────────────────────────────────── */
+
+// Layout das posições no campo (x%, y% dentro do canvas)
+const FIELD_POSITIONS = {
+  QB:  { x:50, y:52, label:"QB" },
+  RB:  { x:50, y:65, label:"RB" },
+  WR:  { x:18, y:42, label:"WR" },
+  WR2: { x:82, y:42, label:"WR" },  // segundo WR
+  TE:  { x:70, y:52, label:"TE" },
+  OL:  { x:50, y:58, label:"OL" },
+  // Defesa (lado oposto)
+  DE:  { x:30, y:30, label:"DE" },
+  DT:  { x:50, y:28, label:"DT" },
+  DE2: { x:70, y:30, label:"DE" },
+  LB:  { x:40, y:20, label:"LB" },
+  LB2: { x:60, y:20, label:"LB" },
+  CB:  { x:12, y:15, label:"CB" },
+  CB2: { x:88, y:15, label:"CB" },
+  S:   { x:35, y:10, label:"S"  },
+  S2:  { x:65, y:10, label:"S"  },
+  K:   { x:50, y:78, label:"K"  },
+};
+
+let fieldActivePos = null;
+let fieldTeam = null;
+
+function drawField(team) {
+  fieldTeam = team;
+  const canvas = document.getElementById("field-canvas");
+  if (!canvas) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0) {
+    requestAnimationFrame(() => drawField(team));
+    return;
+  }
+  canvas.width  = rect.width  * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(1,0,0,1,0,0);
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+
+  // Fundo do campo
+  const fieldGrad = ctx.createLinearGradient(0, 0, 0, H);
+  fieldGrad.addColorStop(0,   "#1a3a1a");
+  fieldGrad.addColorStop(0.5, "#1e4a1e");
+  fieldGrad.addColorStop(1,   "#1a3a1a");
+  ctx.fillStyle = fieldGrad;
+  roundRectField(ctx, 0, 0, W, H, 12);
+  ctx.fill();
+
+  // Linhas do campo
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1;
+  for (let i = 1; i < 5; i++) {
+    ctx.beginPath();
+    ctx.moveTo(0, H * i / 5);
+    ctx.lineTo(W, H * i / 5);
+    ctx.stroke();
+  }
+  // Linha de scrimmage (aprox 55%)
+  ctx.strokeStyle = "rgba(255,255,255,0.3)";
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath(); ctx.moveTo(0, H * 0.55); ctx.lineTo(W, H * 0.55); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Labels defesa/ataque
+  ctx.fillStyle = "rgba(255,255,255,0.2)";
+  ctx.font = `bold ${Math.floor(W*0.07)}px Segoe UI`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("DEF", W/2, H * 0.15);
+  ctx.fillText("ATQ", W/2, H * 0.72);
+
+  // Desenha cada posição
+  const posOrder = ["QB","RB","WR","WR2","TE","OL","DE","DT","DE2","LB","LB2","CB","CB2","S","S2","K"];
+  for (const key of posOrder) {
+    const def = FIELD_POSITIONS[key];
+    if (!def) continue;
+
+    // Acha o jogador para essa posição
+    const basePos = def.label;
+    const posPlayers = team.getAllAtPosition(basePos);
+    // Para posições duplas (WR2, DE2 etc.), pega o segundo jogador
+    const isDuplicate = key.endsWith("2");
+    const playerIdx = isDuplicate ? 1 : 0;
+    const p = posPlayers[playerIdx] || posPlayers[0];
+    if (!p && basePos !== "K") continue;
+
+    const px = W * def.x / 100;
+    const py = H * def.y / 100;
+    const r  = Math.min(W, H) * 0.065;
+    const isActive = fieldActivePos === key;
+    const isDefense = ["DE","DT","DE2","LB","LB2","CB","CB2","S","S2"].includes(key);
+
+    // Círculo da posição
+    const color = isDefense ? "#4d9de0" : "#e8a020";
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI*2);
+    ctx.fillStyle = isActive
+      ? color
+      : `rgba(${isDefense ? "77,157,224" : "232,160,32"},0.25)`;
+    ctx.fill();
+    ctx.strokeStyle = isActive ? "#fff" : color;
+    ctx.lineWidth = isActive ? 2.5 : 1.5;
+    ctx.stroke();
+
+    // Abreviação da posição
+    ctx.fillStyle = isActive ? "#0d1117" : color;
+    ctx.font = `bold ${Math.floor(r * 0.75)}px Segoe UI`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(def.label, px, py - r * 0.15);
+
+    // Nome curto do jogador
+    if (p) {
+      const parts = p.name.split(" ");
+      const shortName = parts.length > 1 ? parts[parts.length-1] : parts[0];
+      ctx.fillStyle = isActive ? "#0d1117" : "rgba(255,255,255,0.85)";
+      ctx.font = `${Math.floor(r * 0.55)}px Segoe UI`;
+      ctx.fillText(shortName.substring(0,8), px, py + r * 0.35);
+    }
+  }
+}
+
+function roundRectField(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+
+function onFieldClick(e) {
+  const canvas = document.getElementById("field-canvas");
+  if (!canvas || !fieldTeam) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const W = rect.width, H = rect.height;
+  const r = Math.min(W, H) * 0.065;
+
+  for (const [key, def] of Object.entries(FIELD_POSITIONS)) {
+    const px = W * def.x / 100;
+    const py = H * def.y / 100;
+    const dist = Math.sqrt((mx-px)**2 + (my-py)**2);
+    if (dist <= r * 1.3) {
+      fieldActivePos = key;
+      drawField(fieldTeam);
+      showFieldSidebar(key, def.label);
+      return;
+    }
+  }
+  fieldActivePos = null;
+  drawField(fieldTeam);
+  document.getElementById("sidebar-player-list").innerHTML = "";
+  document.getElementById("sidebar-title") && (document.querySelector(".sidebar-title").textContent = "Clique em uma posição para trocar");
+}
+
+function showFieldSidebar(posKey, posLabel) {
+  if (!fieldTeam) return;
+  const players = fieldTeam.getAllAtPosition(posLabel);
+  const isDup = posKey.endsWith("2");
+  const curIdx = fieldTeam.activeStarter[posLabel] ?? 0;
+  // Para WR2/DE2 etc., o "titular" da segunda posição é o índice 1 quando disponível
+  const listEl = document.getElementById("sidebar-player-list");
+  const titleEl = document.querySelector(".sidebar-title");
+  if (titleEl) titleEl.textContent = `${posLabel} — escolha o titular`;
+
+  listEl.innerHTML = players.map((p, idx) => {
+    const isCurrent = idx === (isDup ? 1 : curIdx);
+    return `<div class="field-sidebar-player ${isCurrent ? "current" : ""}"
+      onclick="selectFieldPlayer('${posLabel}',${idx},'${posKey}')">
+      <span class="fsp-ovr ${ovrColorClass(p.overall)}">${p.overall}</span>
+      <span class="fsp-name">${p.name}</span>
+      ${isCurrent ? '<span class="fsp-tag">TIT</span>' : ""}
+    </div>`;
+  }).join("") || `<div style="color:var(--muted);font-size:12px;padding:8px;">Sem jogadores</div>`;
+}
+
+function selectFieldPlayer(posLabel, playerIdx, posKey) {
+  if (!fieldTeam) return;
+  const isDup = posKey.endsWith("2");
+  if (!isDup) {
+    fieldTeam.substitute(posLabel, playerIdx);
+    matchupState.myTeamFull = fieldTeam;
+  }
+  drawField(fieldTeam);
+  showFieldSidebar(posKey, posLabel);
+}
+
+function initFieldCanvas() {
+  const canvas = document.getElementById("field-canvas");
+  if (!canvas) return;
+  canvas.onclick = onFieldClick;
+  // Resize observer
+  if (!canvas._fieldRO) {
+    canvas._fieldRO = new ResizeObserver(() => { if (fieldTeam) drawField(fieldTeam); });
+    canvas._fieldRO.observe(canvas);
+  }
+  if (fieldTeam) drawField(fieldTeam);
 }
 
 function renderSeasonTab() {
@@ -648,7 +862,14 @@ function _renderMyRoster(roster, canRelease) {
         <span class="tr-name">${p.name}</span>
         <span class="tr-ovr ${ovrColorClass(p.overall)}">${p.overall}</span>
         <span class="tr-salary">${salaryLabel(p.salary || calcSalary(p.overall, pos))}</span>
-        ${canRelease && !isStarter ? `<button class="tr-release-btn" onclick="releasePlayer('${pos}',${idx})">Dispensar</button>` : ""}
+        ${(() => {
+          if (!canRelease) return "";
+          const posPlayers = roster[pos] || [];
+          // Pode dispensar qualquer jogador, exceto se for o único na posição
+          const isOnlyOne = posPlayers.length === 1;
+          if (isOnlyOne) return `<span class="tr-no-release" title="Único na posição">—</span>`;
+          return `<button class="tr-release-btn" onclick="releasePlayer('${pos}',${idx})">Dispensar</button>`;
+        })()}
       </div>`;
     }).join("");
   }).join("");
