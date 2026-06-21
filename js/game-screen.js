@@ -270,19 +270,60 @@ class PlayerGamePanel {
 
   setRoster(team) {
     const order = ["QB","RB","WR","TE","OL","DE","DT","LB","CB","S","K"];
+    const isDefPos = pos => ["DE","DT","LB","CB","S"].includes(pos);
     const rows = order.map(pos => {
       const starter = team.getStarter(pos);
       if (!starter) return "";
       const backup = team.getBackup(pos);
+      const isDef = isDefPos(pos);
+      const injBadge = starter.injured ? `<span class="pr-inj">🚑</span>` : "";
       return `
-        <div class="pr-row" data-pos="${pos}">
-          <span class="pr-pos">${pos}</span>
-          <span class="pr-name">${starter.name}</span>
+        <div class="pr-row ${isDef ? "pr-def" : "pr-off"}" data-pos="${pos}">
+          <span class="pr-pos-badge">${pos}</span>
+          <div class="pr-player-info">
+            <span class="pr-name">${starter.name}</span>
+            ${backup ? `<span class="pr-backup-name">${backup.name} · ${backup.overall}</span>` : ""}
+          </div>
+          ${injBadge}
           <span class="pr-ovr ${ovrColorClass(starter.overall)}">${starter.overall}</span>
-          ${backup ? `<button class="pr-swap-btn" data-pos="${pos}" title="Trocar por ${backup.name} (${backup.overall} OVR)">⇄</button>` : ""}
+          ${backup ? `<button class="pr-swap-btn" data-pos="${pos}" title="→ ${backup.name} (${backup.overall} OVR)">⇄</button>` : `<span class="pr-no-backup"></span>`}
         </div>`;
     }).join("");
-    this.rosterEl.innerHTML = `<div class="pp-history-title">Escalação  ·  Fadiga</div>${rows}`;
+    this.rosterEl.innerHTML = `
+      <div class="pr-section-label off-label">⚔️ Ataque</div>
+      ${order.filter(p => !isDefPos(p)).map(pos => {
+        const s2 = team.getStarter(pos);
+        if (!s2) return "";
+        const b2 = team.getBackup(pos);
+        const injB = s2.injured ? `<span class="pr-inj">🚑</span>` : "";
+        return `<div class="pr-row pr-off" data-pos="${pos}">
+          <span class="pr-pos-badge">${pos}</span>
+          <div class="pr-player-info">
+            <span class="pr-name">${s2.name}</span>
+            ${b2 ? `<span class="pr-backup-name">${b2.name} · ${b2.overall}</span>` : ""}
+          </div>
+          ${injB}
+          <span class="pr-ovr ${ovrColorClass(s2.overall)}">${s2.overall}</span>
+          ${b2 ? `<button class="pr-swap-btn" data-pos="${pos}" title="→ ${b2.name}">⇄</button>` : `<span class="pr-no-backup"></span>`}
+        </div>`;
+      }).join("")}
+      <div class="pr-section-label def-label">🛡️ Defesa</div>
+      ${order.filter(p => isDefPos(p)).map(pos => {
+        const s2 = team.getStarter(pos);
+        if (!s2) return "";
+        const b2 = team.getBackup(pos);
+        const injB = s2.injured ? `<span class="pr-inj">🚑</span>` : "";
+        return `<div class="pr-row pr-def" data-pos="${pos}">
+          <span class="pr-pos-badge">${pos}</span>
+          <div class="pr-player-info">
+            <span class="pr-name">${s2.name}</span>
+            ${b2 ? `<span class="pr-backup-name">${b2.name} · ${b2.overall}</span>` : ""}
+          </div>
+          ${injB}
+          <span class="pr-ovr ${ovrColorClass(s2.overall)}">${s2.overall}</span>
+          ${b2 ? `<button class="pr-swap-btn" data-pos="${pos}" title="→ ${b2.name}">⇄</button>` : `<span class="pr-no-backup"></span>`}
+        </div>`;
+      }).join("")}`;
 
     this.rosterEl.querySelectorAll(".pr-swap-btn").forEach(btn => {
       btn.onclick = () => {

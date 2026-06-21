@@ -819,9 +819,6 @@ function renderStatsTab(content, s) {
   }
   const gp = myRecord.seasonGames;
   const stats = [
-    { label:"Jogos disputados",  val: gp, icon:"🏈" },
-    { label:"Vitórias",          val: myRecord.wins, icon:"✅" },
-    { label:"Derrotas",          val: myRecord.losses, icon:"❌" },
     { label:"Pontos marcados",   val: myRecord.pointsFor, icon:"🎯" },
     { label:"Pontos sofridos",   val: myRecord.pointsAgainst, icon:"🛡️" },
     { label:"Média pontos/jogo", val: (myRecord.pointsFor/gp).toFixed(1), icon:"📈" },
@@ -858,7 +855,9 @@ function renderStatsTab(content, s) {
 
   content.innerHTML = `
     <div style="max-width:700px;margin:0 auto;">
-      <div class="section-title">📊  Temporada ${s.year} — ${myRecord.abbreviation}</div>
+      <div class="section-title">📊  Temporada ${s.year} — ${myRecord.abbreviation}
+        <span style="font-size:13px;color:var(--muted);font-weight:400;margin-left:10px;">${myRecord.recordStr} · ${gp} jogos</span>
+      </div>
       <div class="stats-grid-big">
         ${stats.map(st => `
           <div class="stat-big-card">
@@ -877,17 +876,28 @@ function renderScheduleTab(content, s) {
   let html = `<div class="schedule-wrap">`;
 
   for (const week of weeks) {
-    const games = s.schedule.filter(g => g.week === week);
     const isCurrentWeek = week === s.currentWeek;
+    const allGames = s.schedule.filter(g => g.week === week);
+    const playerGame = allGames.find(g => g.isPlayerGame);
+
+    // Semanas passadas sem jogo do jogador e semanas futuras → colapsado (só nosso jogo)
+    // Semana atual → aberta com todos os jogos
+    const showAll = isCurrentWeek;
+    const gamesToShow = showAll ? allGames : (playerGame ? [playerGame] : []);
+
+    if (!gamesToShow.length) continue;
+
     html += `
-      <div class="schedule-week ${isCurrentWeek ? "current-week" : ""}">
+      <div class="schedule-week ${isCurrentWeek ? "current-week" : ""}" onclick="${!isCurrentWeek ? `toggleScheduleWeek(${week})` : ""}">
         <div class="sched-week-header">
           <span class="sched-week-label">SEMANA ${week}</span>
           ${isCurrentWeek ? '<span class="sched-week-badge">ATUAL</span>' : ""}
+          ${playerGame?.played ? `<span class="sched-result ${playerGame.home === s.playerTeam ? (playerGame.homeScore > playerGame.awayScore ? "win" : "loss") : (playerGame.awayScore > playerGame.homeScore ? "win" : "loss")}">${playerGame.home === s.playerTeam ? (playerGame.homeScore > playerGame.awayScore ? "V" : "D") : (playerGame.awayScore > playerGame.homeScore ? "V" : "D")} ${playerGame.home === s.playerTeam ? `${playerGame.homeScore}–${playerGame.awayScore}` : `${playerGame.awayScore}–${playerGame.homeScore}`}</span>` : ""}
+          ${!isCurrentWeek ? `<span class="sched-toggle" id="sched-toggle-${week}">▼</span>` : ""}
         </div>
-        <div class="sched-games">`;
+        <div class="sched-games" id="sched-games-${week}" style="${!isCurrentWeek ? "display:none;" : ""}">`;
 
-    for (const g of games) {
+    for (const g of (showAll ? allGames : gamesToShow)) {
       const homeT = s.teams[g.home], awayT = s.teams[g.away];
       const isPlayer = g.isPlayerGame;
       const played = g.played;
@@ -901,46 +911,85 @@ function renderScheduleTab(content, s) {
             <span class="sched-city">${homeT?.city||""}</span>
           </div>
           <div class="sched-score">
-            ${played ? `<span class="sched-pts">${g.homeScore}</span><span class="sched-sep">–</span><span class="sched-pts">${g.awayScore}</span>`
-                     : `<span class="sched-vs">VS</span>`}
+            ${played
+              ? `<span class="sched-pts">${g.homeScore}</span><span class="sched-sep">–</span><span class="sched-pts">${g.awayScore}</span>`
+              : `<span class="sched-vs">VS</span>`}
           </div>
           <div class="sched-team away-team" style="border-right:3px solid ${awayColor.primary};">
             <span class="sched-city">${awayT?.city||""}</span>
             <span class="sched-abbr">${g.away}</span>
           </div>
-          ${isPlayer && !played ? `<button class="btn btn-primary sched-play-btn" onclick="playSeasonGame()">▶</button>` : ""}
+          ${isPlayer && !played ? `<button class="btn btn-primary sched-play-btn" onclick="event.stopPropagation();playSeasonGame()">▶ Jogar</button>` : ""}
         </div>`;
     }
+
+    // Contador de jogos da semana se colapsado
+    if (!isCurrentWeek) {
+      html += `<div class="sched-games-all" id="sched-all-${week}" style="display:none;">`;
+      for (const g of allGames.filter(g => !g.isPlayerGame)) {
+        const homeT = s.teams[g.home], awayT = s.teams[g.away];
+        const hc = getTeamColor(g.home), ac = getTeamColor(g.away);
+        html += `
+          <div class="sched-game sched-played">
+            <div class="sched-team home-team" style="border-left:3px solid ${hc.primary};">
+              <span class="sched-abbr">${g.home}</span>
+              <span class="sched-city">${homeT?.city||""}</span>
+            </div>
+            <div class="sched-score">
+              ${g.played ? `<span class="sched-pts">${g.homeScore}</span><span class="sched-sep">–</span><span class="sched-pts">${g.awayScore}</span>` : '<span class="sched-vs">VS</span>'}
+            </div>
+            <div class="sched-team away-team" style="border-right:3px solid ${ac.primary};">
+              <span class="sched-city">${awayT?.city||""}</span>
+              <span class="sched-abbr">${g.away}</span>
+            </div>
+          </div>`;
+      }
+      html += `</div>`;
+    }
+
     html += `</div></div>`;
   }
   html += `</div>`;
   content.innerHTML = html;
 }
 
+function toggleScheduleWeek(week) {
+  const gamesEl  = document.getElementById(`sched-games-${week}`);
+  const toggleEl = document.getElementById(`sched-toggle-${week}`);
+  if (!gamesEl) return;
+  const isOpen = gamesEl.style.display !== "none";
+  gamesEl.style.display = isOpen ? "none" : "block";
+  if (toggleEl) toggleEl.textContent = isOpen ? "▼" : "▲";
+}
+
 /* ─── Classificação por conferência e divisão ──────────────────────────────────── */
 function renderStandingsTab(content, s) {
-  const DIVISIONS = {
-    AFC: ["AFC East","AFC North","AFC South","AFC West"],
-    NFC: ["NFC East","NFC North","NFC South","NFC West"],
+  const DIVS_PT = {
+    AFC: ["Norte","Sul","Leste","Oeste"],
+    NFC: ["Norte","Sul","Leste","Oeste"],
   };
+  const DIV_LABELS = { Norte:"Norte", Sul:"Sul", Leste:"Leste", Oeste:"Oeste" };
 
   let html = `<div class="standings-wrap">`;
-  for (const [conf, divs] of Object.entries(DIVISIONS)) {
+  for (const [conf, divNames] of Object.entries(DIVS_PT)) {
     html += `<div class="conf-block"><div class="conf-title">${conf}</div><div class="conf-divs">`;
-    for (const div of divs) {
+    for (const divName of divNames) {
+      // O division armazenado no TeamRecord é exatamente o divName (ex: "Norte")
       const teams = Object.values(s.teams)
-        .filter(t => t.division === div)
+        .filter(t => t.conference === conf && t.division === divName)
         .sort((a,b) => (b.winPct-a.winPct)||(b.pointDiff-a.pointDiff));
       if (!teams.length) continue;
       html += `
         <div class="division-block">
-          <div class="div-title">${div.replace(conf+" ","")}</div>
+          <div class="div-title">${DIV_LABELS[divName]}</div>
           <table class="div-table">
             <tr><th>Time</th><th>V</th><th>D</th><th>%</th><th>PF</th></tr>
             ${teams.map((t,i) => `
               <tr class="${t.isPlayer?"player-row":""}">
-                <td><span class="div-pos ${i===0?"div-leader":""}">${i===0?"▲":""}</span>
-                  <strong>${t.abbreviation}</strong> <span style="color:var(--muted);font-size:10px;">${t.city}</span>
+                <td>
+                  <span class="div-pos ${i===0?"div-leader":""}">${i===0?"▲":""}</span>
+                  <strong>${t.abbreviation}</strong>
+                  <span style="color:var(--muted);font-size:10px;"> ${t.city}</span>
                 </td>
                 <td>${t.wins}</td><td>${t.losses}</td>
                 <td>${(t.winPct*100).toFixed(0)}%</td>

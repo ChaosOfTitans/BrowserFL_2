@@ -313,18 +313,38 @@ button {
   margin-top: 12px; padding-top: 12px;
   border-top: 1px solid var(--border);
 }
-.pr-row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 5px 0; border-bottom: 1px solid #1c2230;
+.pr-section-label {
+  font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+  padding: 6px 4px 4px; color: var(--muted); border-bottom: 1px solid var(--border);
+  margin-bottom: 2px;
 }
-.pr-pos { font-size: 10px; color: var(--gold); font-weight: 700; width: 26px; flex-shrink: 0; }
-.pr-name { font-size: 11px; color: var(--white); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-section-label.off-label { color: var(--gold); }
+.pr-section-label.def-label { color: var(--blue); }
+.pr-row {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 6px; border-radius: 7px; margin-bottom: 2px;
+  transition: background 0.12s;
+}
+.pr-row:hover { background: var(--surface); }
+.pr-off { border-left: 2px solid rgba(232,160,32,0.3); }
+.pr-def { border-left: 2px solid rgba(77,157,224,0.3); }
+.pr-pos-badge {
+  font-size: 8px; font-weight: 800; color: #0d1117;
+  background: var(--gold); border-radius: 4px;
+  padding: 1px 4px; flex-shrink: 0; min-width: 22px; text-align: center;
+}
+.pr-def .pr-pos-badge { background: var(--blue); }
+.pr-player-info { flex: 1; min-width: 0; }
+.pr-name { font-size: 11px; color: var(--white); font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-backup-name { font-size: 9px; color: var(--muted); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-inj { font-size: 11px; flex-shrink: 0; }
 .pr-fatigue-bar { width: 50px; height: 4px; background: #2d333b; border-radius: 2px; overflow: hidden; flex-shrink: 0; }
 .pr-fatigue-fill { height: 100%; }
 .pr-fatigue-fill.low { background: var(--green); }
 .pr-fatigue-fill.mid { background: var(--gold); }
 .pr-fatigue-fill.high { background: var(--red); }
-.pr-ovr { font-size: 10px; font-weight: 800; width: 22px; text-align: right; flex-shrink: 0; }
+.pr-ovr { font-size: 11px; font-weight: 800; width: 24px; text-align: right; flex-shrink: 0; }
+.pr-no-backup { width: 22px; flex-shrink: 0; }
 .pr-swap-btn {
   width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
   background: var(--surface); border: 1px solid var(--border); color: var(--muted);
@@ -644,10 +664,10 @@ button {
   margin-bottom: 18px;
 }
 .smvp-icon  { font-size: 32px; flex-shrink: 0; }
-.smvp-info  { flex: 1; }
-.smvp-name  { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+.smvp-info  { flex: 1; text-align: center; }
+.smvp-name  { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
 .smvp-pos   { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
-.smvp-stats { font-size: 11px; color: var(--white); line-height: 1.5; }
+.smvp-stats { font-size: 12px; color: var(--white); line-height: 1.6; }
 
 /* ═══════════════════════════════════════════════════════════
    RESPONSIVO — Tablet (≤980px) e Mobile (≤768px)
@@ -1299,3 +1319,14 @@ button {
   .stats-grid-big  { grid-template-columns: repeat(2, 1fr); }
   .standings-wrap  { grid-template-columns: 1fr; }
 }
+
+/* ── Calendário: resultado e toggle ─────────────────────── */
+.sched-result {
+  font-size: 11px; font-weight: 800; padding: 2px 8px;
+  border-radius: 6px; margin-left: auto;
+}
+.sched-result.win  { background: rgba(63,185,80,0.15); color: var(--green); }
+.sched-result.loss { background: rgba(248,81,73,0.15); color: var(--red); }
+.sched-toggle { color: var(--muted); font-size: 10px; margin-left: 8px; flex-shrink: 0; }
+.schedule-week:not(.current-week) { cursor: pointer; }
+.schedule-week:not(.current-week):hover .sched-week-header { background: var(--card); }
