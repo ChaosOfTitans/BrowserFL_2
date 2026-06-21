@@ -281,7 +281,11 @@ function renderMatchupTab(content, s) {
   // Mantém o mesmo elenco (com eventuais trocas) enquanto for a mesma semana
   const weekKey = `${s.currentWeek}-${s.playerTeam}`;
   if (matchupState.weekKey !== weekKey || !matchupState.myTeamFull) {
-    matchupState.myTeamFull = createSampleTeam(myRecord.name, myRecord.city, myRecord.abbreviation, "strong");
+    if (myRecord.roster) {
+      matchupState.myTeamFull = rosterToTeam(myRecord.name, myRecord.abbreviation, myRecord.city, myRecord.roster);
+    } else {
+      matchupState.myTeamFull = createSampleTeam(myRecord.name, myRecord.city, myRecord.abbreviation, "strong");
+    }
     matchupState.weekKey = weekKey;
   }
   const myTeamFull = matchupState.myTeamFull;
@@ -815,8 +819,130 @@ function renderSeasonTab() {
     content.innerHTML = html;
   }
 
+  else if (seasonTab === "ranking") {
+    renderRankingTab(content, s);
+  }
+
+  else if (seasonTab === "history") {
+    renderHistoryTab(content);
+  }
+
   else if (seasonTab === "transfers") {
     renderTransfersTab(content, s);
+  }
+}
+
+/* ─── Ranking da Liga ────────────────────────────────────────────────────────── */
+function renderRankingTab(content, s) {
+  const all = Object.values(s.teams).sort((a,b) =>
+    (b.winPct - a.winPct) || (b.pointDiff - a.pointDiff) || (b.wins - a.wins)
+  );
+
+  const medals = ["🥇","🥈","🥉"];
+  content.innerHTML = `
+    <div style="max-width:600px;margin:0 auto;">
+      <div class="section-title">🏆  Ranking Geral da Liga — ${s.year}</div>
+      <table class="standings-table ranking-table">
+        <tr><th>#</th><th>Time</th><th>Conf</th><th>V-D</th><th>%</th><th>PF</th><th>PA</th><th>Saldo</th></tr>
+        ${all.map((t, i) => `
+          <tr class="${t.isPlayer ? "player-row" : ""}">
+            <td>${medals[i] || (i+1)}</td>
+            <td><strong>${t.abbreviation}</strong> ${t.city}</td>
+            <td style="color:var(--muted);font-size:11px;">${t.conference}</td>
+            <td>${t.wins}-${t.losses}${t.ties ? `-${t.ties}` : ""}</td>
+            <td>${(t.winPct*100).toFixed(0)}%</td>
+            <td>${t.pointsFor}</td>
+            <td>${t.pointsAgainst}</td>
+            <td class="${t.pointDiff >= 0 ? "green" : "red"}">${t.pointDiff >= 0 ? "+" : ""}${t.pointDiff}</td>
+          </tr>`).join("")}
+      </table>
+    </div>`;
+}
+
+/* ─── Histórico de temporadas ────────────────────────────────────────────────── */
+const SEASON_HISTORY_KEY = "browserfl_history";
+
+function saveSeasonToHistory(s) {
+  const history = JSON.parse(localStorage.getItem(SEASON_HISTORY_KEY) || "[]");
+  const playerRec = s.teams[s.playerTeam];
+  history.unshift({
+    year:     s.year,
+    team:     s.playerTeam,
+    record:   playerRec ? playerRec.recordStr : "0-0",
+    wins:     playerRec ? playerRec.wins : 0,
+    losses:   playerRec ? playerRec.losses : 0,
+    pointsFor:   playerRec ? playerRec.pointsFor : 0,
+    champion: s.champion || null,
+    savedAt:  Date.now(),
+  });
+  // Mantém só os últimos 10
+  localStorage.setItem(SEASON_HISTORY_KEY, JSON.stringify(history.slice(0, 10)));
+}
+
+function renderHistoryTab(content) {
+  const history = JSON.parse(localStorage.getItem(SEASON_HISTORY_KEY) || "[]");
+  if (!history.length) {
+    content.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);">
+      Nenhuma temporada concluída ainda. Complete a temporada regular e os playoffs para ver o histórico.
+    </div>`;
+    return;
+  }
+
+  content.innerHTML = `
+    <div style="max-width:600px;margin:0 auto;">
+      <div class="section-title">📚  Histórico de Temporadas</div>
+      <div class="history-list">
+        ${history.map(h => `
+          <div class="history-card ${h.champion ? "champion-card" : ""}">
+            <div class="hc-year">${h.year}</div>
+            <div class="hc-info">
+              <div class="hc-team">${h.team} — ${h.record}</div>
+              <div class="hc-pts">${h.pointsFor} pontos marcados</div>
+            </div>
+            <div class="hc-result">
+              ${h.champion ? "🏆 CAMPEÃO" : h.wins >= 9 ? "✅ Playoffs" : "❌ Eliminado"}
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
+
+/* ─── Animação de Campeão ────────────────────────────────────────────────────── */
+function showChampionAnimation(teamAbbr, teamName) {
+  // Salva no histórico
+  if (currentSeason) {
+    currentSeason.champion = teamAbbr;
+    saveSeasonToHistory(currentSeason);
+    saveSeasonToStorage(currentSaveId, currentSeason);
+  }
+
+  const overlay = document.createElement("div");
+  overlay.className = "champion-overlay";
+  overlay.innerHTML = `
+    <div class="champion-modal">
+      <div class="champ-confetti" id="champ-confetti"></div>
+      <div class="champ-trophy">🏆</div>
+      <div class="champ-title">CAMPEÃO!</div>
+      <div class="champ-team">${teamName}</div>
+      <div class="champ-subtitle">Super Bowl ${currentSeason?.year || ""}</div>
+      <button class="btn btn-primary" style="width:200px;margin-top:24px;"
+        onclick="this.closest('.champion-overlay').remove(); showScreen('menu-screen'); refreshMenuScreen();">
+        🎉  Celebrar!
+      </button>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  // Confetti
+  const confettiEl = document.getElementById("champ-confetti");
+  const colors = ["#e8a020","#fff","#3fb950","#4d9de0","#f85149","#bc8cff"];
+  for (let i = 0; i < 80; i++) {
+    const c = document.createElement("div");
+    c.className = "confetti-piece";
+    c.style.cssText = `left:${Math.random()*100}%;background:${colors[i%colors.length]};
+      animation-delay:${Math.random()*2}s;animation-duration:${2+Math.random()*2}s;
+      width:${6+Math.random()*8}px;height:${6+Math.random()*8}px;
+      border-radius:${Math.random() > 0.5 ? "50%" : "0"};`;
+    confettiEl.appendChild(c);
   }
 }
 
@@ -1212,7 +1338,7 @@ function playSeasonGame() {
     const playerRecord = s.teams[s.playerTeam];
     const gameState = gameScreen.state;
     if (gameState && playerRecord) {
-      const myTeamInGame = gameState.homeTeam; // jogador sempre é home
+      const myTeamInGame = gameState.homeTeam;
       playerRecord.seasonPassYards   += myTeamInGame.passYards   || 0;
       playerRecord.seasonRushYards   += myTeamInGame.rushYards   || 0;
       playerRecord.seasonTotalYards  += myTeamInGame.totalYards  || 0;
@@ -1222,7 +1348,6 @@ function playSeasonGame() {
       playerRecord.seasonFGs         += Math.round((myScore % 7) / 3);
       playerRecord.seasonGames       += 1;
 
-      // Salva MVP da partida para histórico da temporada
       const mvp = getTeamMVP(myTeamInGame);
       if (mvp && mvp.mvpScore() > 0) {
         if (!playerRecord.seasonMVPs) playerRecord.seasonMVPs = [];
@@ -1231,12 +1356,58 @@ function playSeasonGame() {
           week: s.currentWeek, stats: formatPlayerStats(mvp), score: mvp.mvpScore()
         });
       }
+
+      // Persiste lesões ocorridas no jogo de volta ao roster
+      if (playerRecord.roster) {
+        for (const [pos, players] of Object.entries(myTeamInGame.roster)) {
+          for (const enginePlayer of players) {
+            if (enginePlayer.injured) {
+              const rosterPos = playerRecord.roster[pos] || [];
+              const rp = rosterPos.find(r => r.name === enginePlayer.name);
+              if (rp) {
+                rp.injured      = true;
+                rp.injurySev    = enginePlayer.injurySev    || "mild";
+                rp.gamesMissed  = enginePlayer.gamesMissed  || 0;
+                rp.injuryLabel  = enginePlayer.injuryLabel  || "leve";
+              }
+            }
+          }
+        }
+      }
     }
 
+    // Avança semana — decrementa contador de lesões
     s.currentWeek = Math.min(18, s.currentWeek + 1);
+    if (playerRecord?.roster) {
+      for (const players of Object.values(playerRecord.roster)) {
+        for (const p of players) {
+          if (p.injured && p.gamesMissed > 0) {
+            p.gamesMissed--;
+            if (p.gamesMissed === 0) p.injured = false;
+          } else if (p.injured && (!p.gamesMissed || p.gamesMissed <= 0)) {
+            // Lesão leve: recupera automaticamente
+            p.injured = false;
+          }
+        }
+      }
+    }
+
     saveSeasonToStorage(currentSaveId, s);
     window.onGameFinished = () => {};
     matchupState.weekKey = null;
+
+    // Verifica se o jogador venceu o Super Bowl
+    const playerGame = s.schedule?.find(g => g.isPlayerGame && g.week === s.currentWeek - 1 && g.played);
+    const playerWon = playerGame && (
+      (playerGame.home === s.playerTeam && realHomeScore > realAwayScore) ||
+      (playerGame.away === s.playerTeam && realAwayScore > realHomeScore)
+    );
+    if (s.phase === "superbowl" && playerWon) {
+      const playerRec = s.teams[s.playerTeam];
+      showChampionAnimation(s.playerTeam, `${playerRec.city} ${playerRec.name}`);
+      return;
+    }
+
     showScreen("season-screen");
     refreshSeasonScreen();
   };

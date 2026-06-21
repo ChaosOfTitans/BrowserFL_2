@@ -379,84 +379,119 @@ class GameEngine {
   }
 
   _resolveRun(play, offense, defense) {
-    const rb = offense.getStarter(Position.RB);
-    const ol = offense.getStarter(Position.OL);
-    const lb = defense.getStarter(Position.LB);
-    const dt = defense.getStarter(Position.DT);
+    const rb  = offense.getStarter(Position.RB);
+    const ol  = offense.getStarter(Position.OL);
+    const lb  = defense.getStarter(Position.LB);
+    const dt  = defense.getStarter(Position.DT);
+    const de  = defense.getStarter(Position.DE);
 
-    let offPower = 50;
-    if (rb) offPower += rb.effectiveStat("running") * 0.4;
-    if (ol) offPower += ol.effectiveStat("blocking") * 0.3;
-    let defPower = 50;
-    if (lb) defPower += lb.effectiveStat("tackle") * 0.4;
-    if (dt) defPower += dt.effectiveStat("tackle") * 0.3;
+    // Atributos ofensivos
+    const runPow = (rb ? rb.effectiveStat("running")  : 60) * 0.45
+                 + (ol ? ol.effectiveStat("blocking") : 60) * 0.35
+                 + (rb ? rb.effectiveStat("speed")    : 60) * 0.20;
 
-    const ratio = offPower / Math.max(1, defPower);
-    let baseYards = randGauss(3.5 * ratio, 2.5);
-    baseYards *= (0.8 + play.reward * 0.08);
-    let yards = Math.floor(baseYards);
+    // Atributos defensivos
+    const defPow = (lb ? lb.effectiveStat("tackle") : 60) * 0.40
+                 + (dt ? dt.effectiveStat("tackle") : 60) * 0.35
+                 + (de ? de.effectiveStat("tackle") : 50) * 0.25;
 
-    if (Math.random() < 0.015) {
+    // Estilo de jogo: Risk/Reward do playbook afeta variância e média
+    const aggFactor = 0.7 + play.risk * 0.12; // agressivo = mais arriscado, mais ganho
+    const ratio = (runPow / Math.max(1, defPow)) * aggFactor;
+
+    // Variância maior para jogadas externas
+    const stdDev = play.playType === PlayType.RUN_OUTSIDE ? 3.5 : 2.5;
+    let yards = Math.floor(randGauss(4.0 * ratio, stdDev));
+
+    // Chance de fumble: agressividade aumenta risco
+    const fumbleChance = 0.012 + (play.risk - 1) * 0.004;
+    if (Math.random() < fumbleChance) {
       const rbName = rb ? rb.name : "RB";
-      return new PlayResult(Math.max(-2, Math.floor(yards / 2)), "fumble", `FUMBLE! ${rbName} soltou a bola!`, true, 0);
+      return new PlayResult(Math.max(-2, Math.floor(yards / 2)), "fumble",
+        `FUMBLE! ${rbName} soltou a bola!`, true, 0);
     }
 
-    const maxYds = play.playType === PlayType.RUN_OUTSIDE ? 30 : 20;
-    yards = Math.max(-3, Math.min(yards, maxYds));
-    const desc = `Corrida de ${yards} jarda${Math.abs(yards) !== 1 ? "s" : ""}`;
+    // Chance de corrida explosiva (big play) proporcional ao speed do RB
+    const bigPlayChance = rb ? (rb.effectiveStat("speed") - 60) * 0.003 * aggFactor : 0;
+    if (yards >= 8 && Math.random() < bigPlayChance) yards += randInt(5, 15);
+
+    const maxYds = play.playType === PlayType.RUN_OUTSIDE ? 35 : 22;
+    yards = Math.max(-4, Math.min(yards, maxYds));
+    const desc = yards >= 15 ? `GRANDE CORRIDA! ${rb?.name || "RB"} — ${yards} jardas`
+               : `Corrida de ${yards} jarda${Math.abs(yards) !== 1 ? "s" : ""}`;
     return new PlayResult(yards, "normal", desc);
   }
 
   _resolvePass(play, offense, defense) {
     const qb = offense.getStarter(Position.QB);
     const wr = offense.getStarter(Position.WR);
+    const te = offense.getStarter(Position.TE);
     const de = defense.getStarter(Position.DE);
     const cb = defense.getStarter(Position.CB);
     const s  = defense.getStarter(Position.S);
+    const lb = defense.getStarter(Position.LB);
     const ol = offense.getStarter(Position.OL);
 
-    const passRush = de ? de.effectiveStat("pass_rush") : 50;
-    const blocking = ol ? ol.effectiveStat("blocking")  : 50;
-    const sackChance = Math.max(0.01, 0.06 + (passRush - blocking) * 0.0015 + (play.risk - 1) * 0.01);
+    // Pressão: pass rush vs bloqueio — agressividade aumenta chance de sack
+    const passRush = (de ? de.effectiveStat("pass_rush") : 55) * 0.7
+                   + (lb ? lb.effectiveStat("pass_rush") : 40) * 0.3;
+    const blocking = ol ? ol.effectiveStat("blocking") : 55;
+    const sackChance = Math.max(0.01, 0.055 + (passRush - blocking) * 0.0018 + (play.risk - 1) * 0.012);
     if (Math.random() < sackChance) {
-      const qbName = qb ? qb.name : "QB";
-      return new PlayResult(randInt(-8, -3), "sack", `SACK! ${qbName} derrubado atrás da linha!`);
+      const deName = de ? de.name : "Defesa";
+      return new PlayResult(randInt(-9,-3), "sack", `SACK! ${deName} derruba o QB!`);
     }
 
+    // Profundidade base pelo tipo de rota
     const depthMap = {
-      [PlayType.PASS_SHORT]:  [3, 11],
-      [PlayType.PASS_MEDIUM]: [7, 19],
-      [PlayType.PASS_DEEP]:   [18, 45],
-      [PlayType.PLAY_ACTION]: [6, 22],
-      [PlayType.SCREEN]:      [1, 11],
-      [PlayType.QB_SCRAMBLE]: [1, 13],
+      [PlayType.PASS_SHORT]:  [3, 10],
+      [PlayType.PASS_MEDIUM]: [8, 20],
+      [PlayType.PASS_DEEP]:   [20, 50],  // agressivo = mais yards potenciais
+      [PlayType.PLAY_ACTION]: [8, 28],
+      [PlayType.SCREEN]:      [1, 9],
+      [PlayType.QB_SCRAMBLE]: [2, 14],
     };
-    const [minYds, maxYds] = depthMap[play.playType] || [4, 13];
+    const [minYds, maxYds] = depthMap[play.playType] || [4, 14];
 
+    // Atributos de ataque — TE pode ser alvo em certas jogadas
     const qbPass  = qb ? qb.effectiveStat("passing")  : 65;
     const wrCatch = wr ? wr.effectiveStat("catching") : 65;
-    const cbCov   = cb ? cb.effectiveStat("coverage") : 65;
-    const sCov    = s  ? s.effectiveStat("coverage")  : 60;
+    const teCatch = te ? te.effectiveStat("catching") : 55;
+    // Play Action usa mais o TE
+    const recvStat = play.playType === PlayType.PLAY_ACTION ? teCatch : wrCatch;
+    const recvPlayer = play.playType === PlayType.PLAY_ACTION && te ? te : wr;
 
-    const completionBase = (qbPass * 0.4 + wrCatch * 0.3) / 100;
-    const coveragePenalty = (cbCov * 0.25 + sCov * 0.15) / 100;
-    const completionChance = Math.max(0.18, Math.min(0.82, 0.60 + completionBase - coveragePenalty));
+    // Cobertura defensiva — blitz reduz coverage, zone aumenta
+    const cbCov = cb ? cb.effectiveStat("coverage") : 65;
+    const sCov  = s  ? s.effectiveStat("coverage")  : 60;
+    const covBonus = this._defStyle === PlayType.DEF_BLITZ ? -8 : 0; // blitz abre gaps
+    const totalCov = (cbCov * 0.55 + sCov * 0.35) + covBonus;
 
-    const intBase = 0.04 + (play.risk - 1) * 0.015;
-    if (Math.random() < intBase * (1 - completionChance + 0.5)) {
-      const cbName = cb ? cb.name : "CB";
-      return new PlayResult(0, "interception", `INTERCEPTADO! ${cbName} roubou a bola!`, true, 0);
+    // Chance de completar
+    const offSkill = (qbPass * 0.50 + recvStat * 0.30) / 100;
+    const defSkill = totalCov / 100;
+    const completionChance = Math.max(0.15, Math.min(0.84, 0.55 + offSkill - defSkill * 0.4));
+
+    // Interceptação: deep passes e alta agressividade + alta cobertura aumentam chance
+    const intRisk = (play.playType === PlayType.PASS_DEEP ? 0.04 : 0.02)
+                  + (play.risk - 1) * 0.012
+                  + (totalCov - 65) * 0.0008;
+    if (Math.random() < Math.max(0.01, intRisk) * (1 - completionChance + 0.4)) {
+      const defName = cb ? cb.name : (s ? s.name : "Defesa");
+      return new PlayResult(0, "interception", `INTERCEPTADO! ${defName} roubou a bola!`, true, 0);
     }
 
     if (Math.random() < completionChance) {
-      const yards = Math.floor(randUniform(minYds, maxYds));
-      const wrName = wr ? wr.name : "WR";
-      let desc = `Passe completo para ${wrName} — ${yards} jardas`;
-      if (yards >= 25) desc += " GRANDE GANHO!";
+      let yards = Math.floor(randUniform(minYds, maxYds));
+      // Jogadas agressivas bem executadas ganham yards extra
+      if (play.risk >= 3 && Math.random() < 0.25) yards = Math.floor(yards * 1.3);
+      const recvName = recvPlayer ? recvPlayer.name : "WR";
+      let desc = yards >= 30 ? `🎯 PASSE LONGO! ${recvName} — ${yards} jardas`
+               : yards >= 15 ? `Passe para ${recvName} — ${yards} jardas — grande ganho!`
+               : `Passe para ${recvName} — ${yards} jardas`;
       return new PlayResult(yards, "normal", desc);
     }
-
-    return new PlayResult(0, "normal", "Passe incompleto — bola no chão");
+    return new PlayResult(0, "normal", "Passe incompleto");
   }
 
   simulatePlay(offPlay, defPlay) {
@@ -518,19 +553,41 @@ class GameEngine {
   }
 
   _calcMatchup(off, defPlay) {
+    // Salva o estilo defensivo para uso interno no _resolvePass
+    this._defStyle = defPlay.playType;
+
     const matchups = {
-      [`${PlayType.RUN_INSIDE}|${PlayType.DEF_BLITZ}`]: 3,
-      [`${PlayType.RUN_OUTSIDE}|${PlayType.DEF_BLITZ}`]: 2,
-      [`${PlayType.PASS_DEEP}|${PlayType.DEF_BLITZ}`]: 5,
-      [`${PlayType.PASS_SHORT}|${PlayType.DEF_BLITZ}`]: 2,
-      [`${PlayType.PASS_DEEP}|${PlayType.DEF_PREVENT}`]: -6,
-      [`${PlayType.PASS_SHORT}|${PlayType.DEF_ZONE}`]: -1,
-      [`${PlayType.PASS_MEDIUM}|${PlayType.DEF_MAN}`]: 3,
-      [`${PlayType.PLAY_ACTION}|${PlayType.DEF_MAN}`]: 4,
-      [`${PlayType.PLAY_ACTION}|${PlayType.DEF_ZONE}`]: 2,
-      [`${PlayType.SCREEN}|${PlayType.DEF_BLITZ}`]: 5,
-      [`${PlayType.SCREEN}|${PlayType.DEF_MAN}`]: 2,
-      [`${PlayType.RUN_INSIDE}|${PlayType.DEF_RUSH}`]: -2,
+      // Blitz: abre espaço para corrida e passes rápidos, mas expõe no deep
+      [`${PlayType.RUN_INSIDE}|${PlayType.DEF_BLITZ}`]:  4,
+      [`${PlayType.RUN_OUTSIDE}|${PlayType.DEF_BLITZ}`]: 3,
+      [`${PlayType.SCREEN}|${PlayType.DEF_BLITZ}`]:      7,  // screen mata blitz
+      [`${PlayType.PASS_DEEP}|${PlayType.DEF_BLITZ}`]:   6,  // deep passa pela blitz
+      [`${PlayType.PASS_SHORT}|${PlayType.DEF_BLITZ}`]:  2,
+      [`${PlayType.PLAY_ACTION}|${PlayType.DEF_BLITZ}`]: 4,
+
+      // Zone: fecha passes curtos/médios mas abre crossing routes
+      [`${PlayType.PASS_SHORT}|${PlayType.DEF_ZONE}`]:   -2,
+      [`${PlayType.PASS_MEDIUM}|${PlayType.DEF_ZONE}`]:  -1,
+      [`${PlayType.PLAY_ACTION}|${PlayType.DEF_ZONE}`]:   3,  // PA engana zone
+      [`${PlayType.PASS_DEEP}|${PlayType.DEF_ZONE}`]:    -1,
+
+      // Man: vulnerável para rotas definidas, forte no curto
+      [`${PlayType.PASS_MEDIUM}|${PlayType.DEF_MAN}`]:   3,  // crossing bate man
+      [`${PlayType.PLAY_ACTION}|${PlayType.DEF_MAN}`]:   5,  // PA desmarca TE
+      [`${PlayType.SCREEN}|${PlayType.DEF_MAN}`]:        3,
+      [`${PlayType.PASS_SHORT}|${PlayType.DEF_MAN}`]:   -1,
+
+      // Prevent: fecha tudo longo, abre o curto
+      [`${PlayType.PASS_DEEP}|${PlayType.DEF_PREVENT}`]: -7,
+      [`${PlayType.PASS_SHORT}|${PlayType.DEF_PREVENT}`]: 4,
+      [`${PlayType.SCREEN}|${PlayType.DEF_PREVENT}`]:    4,
+      [`${PlayType.RUN_INSIDE}|${PlayType.DEF_PREVENT}`]: 3,
+
+      // Rush (DL Bull Rush): para corrida mas QB rápido escapa
+      [`${PlayType.RUN_INSIDE}|${PlayType.DEF_RUSH}`]:  -3,
+      [`${PlayType.RUN_OUTSIDE}|${PlayType.DEF_RUSH}`]: -2,
+      [`${PlayType.QB_SCRAMBLE}|${PlayType.DEF_RUSH}`]:  3,  // QB scramble bate rush
+      [`${PlayType.SCREEN}|${PlayType.DEF_RUSH}`]:       4,
     };
     return matchups[`${off.playType}|${defPlay.playType}`] || 0;
   }
@@ -545,9 +602,24 @@ class GameEngine {
   }
 
   _checkInjury(player) {
-    // ~0.07% por jogada por jogador → 11 pos × 2 times × 105 jogadas × 0.0007 ≈ 1.6 lesões/jogo
-    if (Math.random() < 0.0007) {
-      player.injured = true;
+    // ~0.06% por jogada → ~1-2 lesões por jogo no total
+    if (Math.random() < 0.0006) {
+      // Gravidade aleatória com distribuição realista
+      const roll = Math.random();
+      let severity, gamesMissed, label;
+      if (roll < 0.55) {
+        severity = "mild"; gamesMissed = 0; label = "leve";           // descansa no jogo, volta na semana que vem
+      } else if (roll < 0.80) {
+        severity = "moderate"; gamesMissed = 1; label = "moderada";   // perde 1 jogo
+      } else if (roll < 0.94) {
+        severity = "serious"; gamesMissed = randInt(2,4); label = "séria"; // perde 2-4 jogos
+      } else {
+        severity = "severe"; gamesMissed = randInt(5,10); label = "grave"; // perde a temporada
+      }
+      player.injured      = true;
+      player.injurySev    = severity;
+      player.gamesMissed  = gamesMissed;
+      player.injuryLabel  = label;
     }
   }
 
