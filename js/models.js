@@ -260,7 +260,7 @@ function createSampleTeam(name, city, abbr, strength = "medium") {
 
   if (roster) {
     for (const p of roster.starters) {
-      const ovr = realOvr(p.ovr);          // OVR fiel ao real
+      const ovr = realOvr(p.ovr);
       const attrs = {};
       if (p.attrs) for (const [k,v] of Object.entries(p.attrs)) attrs[k] = applyM(v);
       team.addPlayer(new Player(p.name, Position[p.pos], ovr, attrs));
@@ -270,6 +270,12 @@ function createSampleTeam(name, city, abbr, strength = "medium") {
       const attrs = {};
       if (p.attrs) for (const [k,v] of Object.entries(p.attrs)) attrs[k] = applyM(v * 0.9);
       team.addPlayer(new Player(p.name, Position[p.pos], ovr, attrs));
+    }
+    // Garante 3 WRs (slot receiver) — adiciona se o time só tiver 2
+    if ((team.roster[Position.WR] || []).length < 3) {
+      const baseOvr = Math.max(40, (team.getAllAtPosition("WR")[1]?.overall || 70) - 8);
+      team.addPlayer(new Player("Slot Receiver", Position.WR, realOvr(baseOvr),
+        { catching: Math.floor(baseOvr * 0.95), speed: Math.floor(baseOvr * 0.98) }));
     }
   } else {
     // Fallback genérico para times sem roster detalhado
@@ -516,10 +522,17 @@ class GameEngine {
     } else {
       result = this._resolvePass(offPlay, offense, defense);
       if (result.event === "normal" && result.yards > 0) {
-        const qb = offense.getStarter(Position.QB);
-        const wr = offense.getStarter(Position.WR);
+        const qb  = offense.getStarter(Position.QB);
+        const wr1 = offense.roster[Position.WR]?.[0];
+        const wr2 = offense.roster[Position.WR]?.[1];
+        const te  = offense.getStarter(Position.TE);
         if (qb) qb.gameStats.passYards += result.yards;
-        if (wr) wr.gameStats.recYards  += result.yards;
+        // Distribui entre WR1 (50%), WR2 (30%), TE (20%) aleatoriamente
+        const r = Math.random();
+        if (r < 0.50 && wr1) { wr1.gameStats.recYards += result.yards; this._lastReceiverPos = 0; }
+        else if (r < 0.80 && wr2) { wr2.gameStats.recYards += result.yards; this._lastReceiverPos = 1; }
+        else if (te) { te.gameStats.recYards += result.yards; this._lastReceiverTe = true; }
+        else if (wr1) { wr1.gameStats.recYards += result.yards; this._lastReceiverPos = 0; }
       } else if (result.event === "sack") {
         const de = defense.getStarter(Position.DE);
         if (de) de.gameStats.sacks += 1;
@@ -674,12 +687,18 @@ class GameEngine {
       const isRun = this._lastRunnerPos === Position.RB;
       if (isRun) {
         const rb = offense.getStarter(Position.RB);
-        if (rb) { rb.gameStats.rushTDs += 1; rb.gameStats.rushYards = Math.max(0, rb.gameStats.rushYards); }
+        if (rb) { rb.gameStats.rushTDs += 1; }
       } else {
-        const qb = offense.getStarter(Position.QB);
-        const wr = offense.getStarter(Position.WR);
+        const qb  = offense.getStarter(Position.QB);
+        const wr1 = offense.roster[Position.WR]?.[0];
+        const wr2 = offense.roster[Position.WR]?.[1];
+        const te  = offense.getStarter(Position.TE);
         if (qb) qb.gameStats.passTDs += 1;
-        if (wr) wr.gameStats.recTDs  += 1;
+        // Crédito ao receptor do último passe
+        if (this._lastReceiverTe && te) te.gameStats.recTDs += 1;
+        else if (this._lastReceiverPos === 1 && wr2) wr2.gameStats.recTDs += 1;
+        else if (wr1) wr1.gameStats.recTDs += 1;
+        this._lastReceiverPos = null; this._lastReceiverTe = false;
       }
       this._lastRunnerPos = null;
       state.switchPossession();

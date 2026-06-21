@@ -1231,3 +1231,71 @@ button {
 .champ-title    { font-size: 48px; font-weight: 900; color: var(--gold); letter-spacing: 4px; text-shadow: 0 0 30px rgba(232,160,32,0.6); }
 .champ-team     { font-size: 28px; font-weight: 800; color: var(--white); margin-top: 8px; }
 .champ-subtitle { font-size: 14px; color: var(--muted); margin-top: 6px; }
+
+/* ═══════════════════════════════════════════════════════════
+   STATS, CALENDÁRIO E CLASSIFICAÇÃO MELHORADOS
+   ═══════════════════════════════════════════════════════════ */
+
+/* Stats grid grande */
+.stats-grid-big {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px;
+}
+.stat-big-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 12px; text-align: center;
+}
+.sbc-icon  { font-size: 20px; margin-bottom: 6px; }
+.sbc-val   { font-size: 22px; font-weight: 800; color: var(--white); margin-bottom: 4px; }
+.sbc-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Calendário */
+.schedule-wrap { display: flex; flex-direction: column; gap: 12px; max-width: 700px; margin: 0 auto; }
+.schedule-week { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.schedule-week.current-week { border-color: var(--gold); }
+.sched-week-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.sched-week-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 1px; }
+.sched-week-badge {
+  font-size: 9px; font-weight: 700; color: var(--gold);
+  background: rgba(232,160,32,0.15); padding: 2px 8px; border-radius: 4px;
+}
+.sched-games { padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.sched-game {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 10px; border-radius: 8px; background: var(--surface);
+  position: relative;
+}
+.sched-game.sched-player-game { background: rgba(232,160,32,0.06); }
+.sched-game.sched-played { opacity: 0.7; }
+.sched-team { display: flex; align-items: center; gap: 6px; flex: 1; }
+.sched-team.away-team { justify-content: flex-end; }
+.sched-abbr { font-size: 13px; font-weight: 800; color: var(--white); width: 34px; }
+.sched-city { font-size: 11px; color: var(--muted); }
+.sched-score { display: flex; align-items: center; gap: 6px; min-width: 80px; justify-content: center; }
+.sched-pts  { font-size: 16px; font-weight: 800; color: var(--white); }
+.sched-sep  { color: var(--muted); }
+.sched-vs   { font-size: 11px; color: var(--muted); font-weight: 600; }
+.sched-play-btn { height: 28px; padding: 0 10px; font-size: 11px; flex-shrink: 0; }
+
+/* Classificação por divisão */
+.standings-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 900px; margin: 0 auto; }
+.conf-block { display: flex; flex-direction: column; gap: 12px; }
+.conf-title { font-size: 14px; font-weight: 800; color: var(--white); letter-spacing: 1px; padding: 8px 0; border-bottom: 2px solid var(--gold); margin-bottom: 4px; }
+.conf-divs  { display: flex; flex-direction: column; gap: 12px; }
+.division-block { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.div-title  { font-size: 10px; font-weight: 700; color: var(--gold); letter-spacing: 1px; text-transform: uppercase; padding: 8px 12px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.div-table  { width: 100%; border-collapse: collapse; font-size: 12px; }
+.div-table th { font-size: 9px; color: var(--muted); padding: 4px 8px; text-align: right; font-weight: 600; }
+.div-table th:first-child { text-align: left; }
+.div-table td { padding: 6px 8px; text-align: right; border-top: 1px solid rgba(255,255,255,0.04); }
+.div-table td:first-child { text-align: left; }
+.div-pos { margin-right: 4px; font-size: 10px; color: var(--green); }
+.div-leader { color: var(--green); }
+
+@media (max-width: 768px) {
+  .stats-grid-big  { grid-template-columns: repeat(2, 1fr); }
+  .standings-wrap  { grid-template-columns: 1fr; }
+}

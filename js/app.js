@@ -785,38 +785,16 @@ function renderSeasonTab() {
     renderMatchupTab(content, s);
   }
 
+  else if (seasonTab === "stats") {
+    renderStatsTab(content, s);
+  }
+
   else if (seasonTab === "schedule") {
-    const games = s.getWeekGames(s.currentWeek);
-    let html = `<h3 style="margin-bottom:12px;color:var(--muted);font-size:13px;">SEMANA ${s.currentWeek}</h3>`;
-    for (const g of games) {
-      const homeT = s.teams[g.home], awayT = s.teams[g.away];
-      const isPlayerGame = g.isPlayerGame;
-      const scoreStr = g.played ? `${g.homeScore} – ${g.awayScore}` : "vs";
-      html += `
-        <div class="week-game-row ${isPlayerGame ? "player-game" : ""}">
-          <div class="teams">${homeT?.abbreviation||g.home}  ${scoreStr}  ${awayT?.abbreviation||g.away}</div>
-          ${isPlayerGame && !g.played ? `<button class="btn btn-primary" id="play-week-btn">▶ Jogar</button>` : (g.played ? `<span class="score">✓</span>` : "")}
-        </div>`;
-    }
-    content.innerHTML = html;
-    const playBtn = document.getElementById("play-week-btn");
-    if (playBtn) playBtn.onclick = () => playSeasonGame();
+    renderScheduleTab(content, s);
   }
 
   else if (seasonTab === "standings") {
-    let html = "";
-    for (const conf of ["AFC","NFC"]) {
-      html += `<h3 style="margin:16px 0 8px;color:var(--muted);font-size:13px;">${conf}</h3>`;
-      html += `<table class="standings-table"><tr><th>Time</th><th>V</th><th>D</th><th>E</th><th>PF</th><th>PA</th></tr>`;
-      const standings = s.getStandings(conf);
-      for (const t of standings) {
-        html += `<tr class="${t.isPlayer ? "player-row" : ""}">
-          <td>${t.city} ${t.name}</td><td>${t.wins}</td><td>${t.losses}</td><td>${t.ties}</td>
-          <td>${t.pointsFor}</td><td>${t.pointsAgainst}</td></tr>`;
-      }
-      html += `</table>`;
-    }
-    content.innerHTML = html;
+    renderStandingsTab(content, s);
   }
 
   else if (seasonTab === "ranking") {
@@ -830,6 +808,151 @@ function renderSeasonTab() {
   else if (seasonTab === "transfers") {
     renderTransfersTab(content, s);
   }
+}
+
+/* ─── Aba Estatísticas ────────────────────────────────────────────────────────── */
+function renderStatsTab(content, s) {
+  const myRecord = s.teams[s.playerTeam];
+  if (!myRecord || myRecord.seasonGames === 0) {
+    content.innerHTML = `<div style="text-align:center;padding:40px;color:var(--muted);">Jogue pelo menos um jogo para ver as estatísticas.</div>`;
+    return;
+  }
+  const gp = myRecord.seasonGames;
+  const stats = [
+    { label:"Jogos disputados",  val: gp, icon:"🏈" },
+    { label:"Vitórias",          val: myRecord.wins, icon:"✅" },
+    { label:"Derrotas",          val: myRecord.losses, icon:"❌" },
+    { label:"Pontos marcados",   val: myRecord.pointsFor, icon:"🎯" },
+    { label:"Pontos sofridos",   val: myRecord.pointsAgainst, icon:"🛡️" },
+    { label:"Média pontos/jogo", val: (myRecord.pointsFor/gp).toFixed(1), icon:"📈" },
+    { label:"Touchdowns",        val: myRecord.seasonTDs, icon:"🏆" },
+    { label:"Field Goals",       val: myRecord.seasonFGs, icon:"🦵" },
+    { label:"Jardas totais",     val: myRecord.seasonTotalYards, icon:"📏" },
+    { label:"Jardas de passe",   val: myRecord.seasonPassYards, icon:"💪" },
+    { label:"Jardas de corrida", val: myRecord.seasonRushYards, icon:"🏃" },
+    { label:"Turnovers",         val: myRecord.seasonTurnovers, icon:"🔄" },
+    { label:"1st Downs",         val: myRecord.seasonFirstDowns, icon:"⬆️" },
+  ];
+
+  // Melhor jogador da temporada
+  let mvpHtml = "";
+  if (myRecord.seasonMVPs?.length) {
+    const byPlayer = {};
+    for (const e of myRecord.seasonMVPs) {
+      if (!byPlayer[e.name]) byPlayer[e.name] = { ...e, totalScore:0, apps:0 };
+      byPlayer[e.name].totalScore += e.score;
+      byPlayer[e.name].apps++;
+    }
+    const best = Object.values(byPlayer).sort((a,b)=>b.totalScore-a.totalScore)[0];
+    mvpHtml = `
+      <div class="section-title">⭐  Melhor Jogador da Temporada</div>
+      <div class="season-mvp-card">
+        <div class="smvp-icon">⭐</div>
+        <div class="smvp-info">
+          <div class="smvp-name ${ovrColorClass(best.ovr)}">${best.name}</div>
+          <div class="smvp-pos">${best.pos} · ${best.ovr} OVR · MVP em ${best.apps} jogo${best.apps!==1?"s":""}</div>
+          <div class="smvp-stats">${best.bestStats||best.stats}</div>
+        </div>
+      </div>`;
+  }
+
+  content.innerHTML = `
+    <div style="max-width:700px;margin:0 auto;">
+      <div class="section-title">📊  Temporada ${s.year} — ${myRecord.abbreviation}</div>
+      <div class="stats-grid-big">
+        ${stats.map(st => `
+          <div class="stat-big-card">
+            <div class="sbc-icon">${st.icon}</div>
+            <div class="sbc-val">${st.val}</div>
+            <div class="sbc-label">${st.label}</div>
+          </div>`).join("")}
+      </div>
+      ${mvpHtml}
+    </div>`;
+}
+
+/* ─── Calendário melhorado ────────────────────────────────────────────────────── */
+function renderScheduleTab(content, s) {
+  const weeks = [...new Set(s.schedule.map(g => g.week))].sort((a,b)=>a-b);
+  let html = `<div class="schedule-wrap">`;
+
+  for (const week of weeks) {
+    const games = s.schedule.filter(g => g.week === week);
+    const isCurrentWeek = week === s.currentWeek;
+    html += `
+      <div class="schedule-week ${isCurrentWeek ? "current-week" : ""}">
+        <div class="sched-week-header">
+          <span class="sched-week-label">SEMANA ${week}</span>
+          ${isCurrentWeek ? '<span class="sched-week-badge">ATUAL</span>' : ""}
+        </div>
+        <div class="sched-games">`;
+
+    for (const g of games) {
+      const homeT = s.teams[g.home], awayT = s.teams[g.away];
+      const isPlayer = g.isPlayerGame;
+      const played = g.played;
+      const homeColor = getTeamColor(g.home);
+      const awayColor = getTeamColor(g.away);
+
+      html += `
+        <div class="sched-game ${isPlayer ? "sched-player-game" : ""} ${played ? "sched-played" : ""}">
+          <div class="sched-team home-team" style="border-left:3px solid ${homeColor.primary};">
+            <span class="sched-abbr">${g.home}</span>
+            <span class="sched-city">${homeT?.city||""}</span>
+          </div>
+          <div class="sched-score">
+            ${played ? `<span class="sched-pts">${g.homeScore}</span><span class="sched-sep">–</span><span class="sched-pts">${g.awayScore}</span>`
+                     : `<span class="sched-vs">VS</span>`}
+          </div>
+          <div class="sched-team away-team" style="border-right:3px solid ${awayColor.primary};">
+            <span class="sched-city">${awayT?.city||""}</span>
+            <span class="sched-abbr">${g.away}</span>
+          </div>
+          ${isPlayer && !played ? `<button class="btn btn-primary sched-play-btn" onclick="playSeasonGame()">▶</button>` : ""}
+        </div>`;
+    }
+    html += `</div></div>`;
+  }
+  html += `</div>`;
+  content.innerHTML = html;
+}
+
+/* ─── Classificação por conferência e divisão ──────────────────────────────────── */
+function renderStandingsTab(content, s) {
+  const DIVISIONS = {
+    AFC: ["AFC East","AFC North","AFC South","AFC West"],
+    NFC: ["NFC East","NFC North","NFC South","NFC West"],
+  };
+
+  let html = `<div class="standings-wrap">`;
+  for (const [conf, divs] of Object.entries(DIVISIONS)) {
+    html += `<div class="conf-block"><div class="conf-title">${conf}</div><div class="conf-divs">`;
+    for (const div of divs) {
+      const teams = Object.values(s.teams)
+        .filter(t => t.division === div)
+        .sort((a,b) => (b.winPct-a.winPct)||(b.pointDiff-a.pointDiff));
+      if (!teams.length) continue;
+      html += `
+        <div class="division-block">
+          <div class="div-title">${div.replace(conf+" ","")}</div>
+          <table class="div-table">
+            <tr><th>Time</th><th>V</th><th>D</th><th>%</th><th>PF</th></tr>
+            ${teams.map((t,i) => `
+              <tr class="${t.isPlayer?"player-row":""}">
+                <td><span class="div-pos ${i===0?"div-leader":""}">${i===0?"▲":""}</span>
+                  <strong>${t.abbreviation}</strong> <span style="color:var(--muted);font-size:10px;">${t.city}</span>
+                </td>
+                <td>${t.wins}</td><td>${t.losses}</td>
+                <td>${(t.winPct*100).toFixed(0)}%</td>
+                <td>${t.pointsFor}</td>
+              </tr>`).join("")}
+          </table>
+        </div>`;
+    }
+    html += `</div></div>`;
+  }
+  html += `</div>`;
+  content.innerHTML = html;
 }
 
 /* ─── Ranking da Liga ────────────────────────────────────────────────────────── */

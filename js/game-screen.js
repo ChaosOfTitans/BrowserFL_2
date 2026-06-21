@@ -806,6 +806,10 @@ class GameScreenController {
         team.substitute(position, parseInt(btn.dataset.idx));
         modal.classList.remove("active");
         this.refreshUI();
+        // Retoma o jogo automaticamente após substituição
+        if (!this.state.gameOver && !this.timerHandle) {
+          this.timerHandle = setInterval(() => this.tick(), this.spdInterval);
+        }
       };
     });
   }
